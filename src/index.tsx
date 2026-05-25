@@ -32,8 +32,8 @@ interface SubEntry {
   title: string
   agent: string
   prompt: string
-  command?: string
-  model?: string
+  /** Context tokens consumed by the sub‑agent */
+  tokens?: number
   status: SubStatus
   /** Sub‑agent session ID — used to match session.idle / session.error events */
   sessionId?: string
@@ -52,15 +52,17 @@ const I18N: Record<Lang, Record<string, string>> = {
     "panel.title": "子任务",
     "status.none": "暂无子任务",
     "prompt.label": "描述",
-    "model.label": "模型",
-    "cmd.label": "命令",
+    "agent.label": "代理",
+    "time.label": "耗时",
+    "tokens.label": "上下文",
   },
   en: {
     "panel.title": "Sub-Agents",
     "status.none": "No sub-agents yet",
     "prompt.label": "prompt",
-    "model.label": "model",
-    "cmd.label": "cmd",
+    "agent.label": "agent",
+    "time.label": "time",
+    "tokens.label": "context",
   },
 }
 
@@ -117,11 +119,17 @@ function truncate(text: string, maxCols: number): string {
 
 function fmtDurationShort(ms: number, running: boolean): string {
   if (running && ms < 2000) return ""
-  if (ms < 1000) return (ms / 1000).toFixed(1) + "s"
-  if (ms < 60000) return (ms / 1000).toFixed(1) + "s"
+  if (ms < 1000) return (ms / 1000).toFixed(2) + "s"
+  if (ms < 60000) return (ms / 1000).toFixed(2) + "s"
   const m = Math.floor(ms / 60000)
   const s = Math.round((ms % 60000) / 1000)
   return `${m}m${s}s`
+}
+
+function fmtTokens(n: number): string {
+  if (n < 1000) return `${n}`
+  if (n < 1000000) return `${(n / 1000).toFixed(1)}k`
+  return `${(n / 1000000).toFixed(1)}M`
 }
 
 // ===================================================================
@@ -244,6 +252,31 @@ function SubAgentPanel(props: {
 
   let boxEl: any
 
+  /** Total context tokens for a sub-agent session.
+   *  Matches opencode-visual-cache's "总计": last assistant message's input + cache.read.
+   *  Only succeeds when sid points to a valid session with token data. */
+  const readSessionTokens = (sid: string): number | undefined => {
+    if (!sid) return undefined
+    try {
+      const msgs = props.api.state.session.messages(sid)
+      if (msgs) {
+        // Walk backwards to find the last assistant message with token data
+        for (let i = (msgs as any[]).length - 1; i >= 0; i--) {
+          const m = (msgs as any[])[i]
+          if (m.role !== "assistant") continue
+          const t = m.tokens
+          if (!t) continue
+          const cache = t.cache as { read?: number; write?: number } | undefined
+          const ctx = (Number(t.input) || 0) + (cache?.read ?? 0)
+          if (ctx > 0) return ctx
+        }
+      }
+      return undefined
+    } catch {
+      return undefined
+    }
+  }
+
   // ── upsert ──
   const upsertEntry = (
     partial: Omit<SubEntry, "startedAt" | "endedAt"> & { startedAt?: number }
@@ -277,35 +310,10 @@ function SubAgentPanel(props: {
       const prompt = String(part.prompt ?? "")
       const desc = String(part.description ?? "")
       const title = desc || truncate(prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(), 40)
-      const command = part.command !== undefined ? String(part.command) : undefined
-
-      // model: try part.model first, fallback to parent message (like visual-cache does)
-      // Only keep model name (last / segment), drop provider prefix for narrow sidebar
-      let model: string | undefined
-      const extractModelName = (raw: string) => raw.split("/").pop() ?? raw
-      const pm = part.model as Record<string, unknown> | undefined
-      if (pm) {
-        const mid: unknown = pm.modelID ?? pm.model ?? pm.modelId
-        if (mid) model = extractModelName(String(mid))
-      }
-      if (!model) {
-        const msgID = String(part.messageID ?? "")
-        const sid = String(props_?.sessionID ?? props.sessionId)
-        if (msgID && sid) {
-          try {
-            const msgs = props.api.state.session.messages(sid)
-            const msg = (msgs as any[])?.find((m: any) => String(m.id) === msgID)
-            if (msg) {
-              const mid: unknown = (msg as any).modelID ?? (msg as any).model ?? (msg as any).modelId
-              if (mid) model = extractModelName(String(mid))
-            }
-          } catch {}
-        }
-      }
 
       const id = `sub:${String(part.id ?? crypto.randomUUID())}`
       const subSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
-      upsertEntry({ id, title, agent, prompt, command, model, sessionId: subSid, status: "running" })
+      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status: "running" })
     }
 
     // ToolPart
@@ -322,27 +330,10 @@ function SubAgentPanel(props: {
       const prompt = String(input?.prompt ?? part.description ?? "")
       const desc = input?.description !== undefined ? String(input.description) : ""
       const title = desc || truncate(prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(), 40)
-      const command = input?.command !== undefined ? String(input.command) : undefined
-
-      // model: fallback to parent message, model name only
-      let model: string | undefined
-      const extractModelName = (raw: string) => raw.split("/").pop() ?? raw
-      const msgID = String(part.messageID ?? "")
-      const sid = String(props_?.sessionID ?? props.sessionId)
-      if (msgID && sid) {
-        try {
-          const msgs = props.api.state.session.messages(sid)
-          const msg = (msgs as any[])?.find((m: any) => String(m.id) === msgID)
-          if (msg) {
-            const mid: unknown = (msg as any).modelID ?? (msg as any).model ?? (msg as any).modelId
-            if (mid) model = extractModelName(String(mid))
-          }
-        } catch {}
-      }
 
       const id = `tool:${String(part.id ?? crypto.randomUUID())}`
       const subSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
-      upsertEntry({ id, title, agent, prompt, command, model, sessionId: subSid, status })
+      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status })
     }
   }
 
@@ -351,13 +342,37 @@ function SubAgentPanel(props: {
     const props_ = e.properties as Record<string, unknown> | undefined
     const sid = String(props_?.sessionID ?? "")
     if (!sid) return
+
+    // Read token usage from completed sub‑agent session
+    const sessionTokens = readSessionTokens(sid)
+    // Also get agent name for fallback matching
+    let sessionAgent: string | undefined
+    try { sessionAgent = props.api.state.session.get(sid)?.agent } catch {}
+
     setEntryMap((prev) => {
       let changed = false
       const next = new Map(prev)
+      // Pass 1: exact sessionId match
       for (const [id, entry] of next) {
         if (entry.status === "running" && entry.sessionId === sid) {
-          next.set(id, { ...entry, status, endedAt: Date.now() })
+          next.set(id, {
+            ...entry, status, endedAt: Date.now(),
+            tokens: entry.tokens ?? sessionTokens,
+          })
           changed = true
+        }
+      }
+      // Pass 2: fallback — match by agent name for orphan entries
+      if (!changed && sessionAgent && sessionTokens) {
+        for (const [id, entry] of next) {
+          if (entry.status === "running" && entry.agent === sessionAgent) {
+            next.set(id, {
+              ...entry, status, endedAt: Date.now(),
+              tokens: sessionTokens, sessionId: sid,
+            })
+            changed = true
+            break
+          }
         }
       }
       return changed ? next : prev
@@ -368,7 +383,28 @@ function SubAgentPanel(props: {
   const bump = () => setRenderTick((v) => v + 1)
 
   onMount(() => {
-    const timer = setInterval(() => { setNow(Date.now()); bump() }, 500)
+    // Fast clock for smooth time display, separate from token polling
+    const clock = setInterval(() => { setNow(Date.now()); bump() }, 100)
+    // Token poll — runs every 500ms for running entries
+    const tokenTimer = setInterval(() => {
+      untrack(() => {
+        setEntryMapRaw((prev) => {
+          let changed = false
+          const next = new Map(prev)
+          for (const [id, entry] of next) {
+            if (entry.status === "running" && entry.sessionId) {
+              const total = readSessionTokens(entry.sessionId)
+              if (total !== undefined && total !== entry.tokens) {
+                next.set(id, { ...entry, tokens: total })
+                changed = true
+              }
+            }
+          }
+          return changed ? next : prev
+        })
+      })
+      bump()
+    }, 500)
     bump()
 
     const unsubPart = props.api.event.on("message.part.updated", (e) => {
@@ -386,7 +422,8 @@ function SubAgentPanel(props: {
     })
 
     onCleanup(() => {
-      clearInterval(timer)
+      clearInterval(clock)
+      clearInterval(tokenTimer)
       unsubPart()
       unsubMsg()
       unsubIdle()
@@ -409,7 +446,6 @@ function SubAgentPanel(props: {
         setEntryMapRaw((prev) => {
           const next = switched ? loadFromKv(sid) : new Map(prev)
           try {
-            const extractModelName = (raw: string) => raw.split("/").pop() ?? raw
             const msgs = props.api.state.session.messages(sid)
             if (msgs && (msgs as any[]).length) {
               for (const msg of msgs) {
@@ -446,17 +482,14 @@ function SubAgentPanel(props: {
                     const prompt = String(input?.prompt ?? (part as any).description ?? "")
                     const desc = input?.description !== undefined ? String(input.description) : ""
                     const title = desc || truncate(prompt.replace(/\n/g, " ").trim(), 40)
-                    const command = input?.command !== undefined ? String(input.command) : undefined
 
-                    let model: string | undefined
-                    const mm = msg as Record<string, unknown>
-                    const mid: unknown = mm.modelID ?? mm.model ?? mm.modelId
-                    if (mid) model = extractModelName(String(mid))
+                    let tokens: number | undefined
+                    const scanSubSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
+                    if (scanSubSid) tokens = readSessionTokens(scanSubSid)
 
-                    const subSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
                     const ended = status === "done" || status === "error"
                     next.set(id, {
-                      id, title, agent, prompt, command, model, sessionId: subSid,
+                      id, title, agent, prompt, tokens, sessionId: scanSubSid,
                       status,
                       startedAt: exists?.startedAt || Date.now(),
                       endedAt: ended ? (exists?.endedAt || Date.now()) : undefined,
@@ -638,22 +671,38 @@ function SubAgentPanel(props: {
               const timeColor = () =>
                 isRunning ? pal().warning : isError ? pal().error : pal().muted
 
-              // Entry label: "title - agent" when room, else just "agent"
-              const suffixW = () =>
-                entry.endedAt === undefined && elapsed() < 2000
-                  ? 0
-                  : visualWidth(fmtDurationShort(elapsed(), isRunning)) + 1
+              // Entry label: when collapsed show "title - agent", when expanded just title
+              const tokenText = () =>
+                !isExpanded() && entry.tokens !== undefined && entry.tokens > 0
+                  ? `\u00b7 ${fmtTokens(entry.tokens!)}`
+                  : ""
+              const timeText = () =>
+                !isExpanded() && (elapsed() >= 2000 || entry.endedAt !== undefined)
+                  ? fmtDurationShort(elapsed(), isRunning)
+                  : ""
+              const suffixW = () => {
+                let w = 0
+                const t = timeText()
+                if (t) w += 1 + visualWidth(t)
+                const tk = tokenText()
+                if (tk) w += visualWidth(tk)
+                return w
+              }
               const avail = () => Math.max(6, panelWidth() - 4 - suffixW())
-              const labelText = () => {
+              const collapsedLabel = () => {
                 const a = avail()
                 const agentW = visualWidth(entry.agent)
-                const minCombined = 4 + visualWidth(" - ") + agentW // at least 4 chars of title
+                const minCombined = 4 + visualWidth(" - ") + agentW
                 if (a >= minCombined && entry.title && entry.title !== entry.agent) {
                   const maxTitle = a - visualWidth(" - ") - agentW
                   return truncate(entry.title, maxTitle) + " - " + entry.agent
                 }
                 return truncate(entry.agent, a)
               }
+              const labelText = () =>
+                isExpanded()
+                  ? truncate(entry.title || entry.agent, Math.max(6, panelWidth() - 4))
+                  : collapsedLabel()
 
               return (
                 <>
@@ -666,18 +715,40 @@ function SubAgentPanel(props: {
                     <span style={{ fg: statusColor }}>{statusDot}</span>
                     {" "}
                     <span style={{ fg: pal().text }}>{labelText()}</span>
-                    {elapsed() >= 2000 || entry.endedAt !== undefined ? (
+                    {timeText() ? (
                       <>
                         {" "}
-                        <span style={{ fg: timeColor() }}>
-                          {fmtDurationShort(elapsed(), isRunning)}
-                        </span>
+                        <span style={{ fg: timeColor() }}>{timeText()}</span>
                       </>
+                    ) : null}
+                    {tokenText() ? (
+                      <span style={{ fg: pal().muted }}>{tokenText()}</span>
                     ) : null}
                   </text>
 
-                  {/* expanded detail — 2‑line prompt, i18n labels */}
+                  {/* expanded detail — agent, time, context, prompt */}
                   <Show when={isExpanded()}>
+                    <text>
+                      {"  "}
+                      <span style={{ fg: pal().primary }}>{t("agent.label")}: </span>
+                      <span style={{ fg: pal().muted }}>{entry.agent}</span>
+                    </text>
+                    <Show when={elapsed() >= 2000 || entry.endedAt !== undefined}>
+                      <text>
+                        {"  "}
+                        <span style={{ fg: pal().primary }}>{t("time.label")}: </span>
+                        <span style={{ fg: pal().muted }}>
+                          {fmtDurationShort(elapsed(), isRunning)}
+                        </span>
+                      </text>
+                    </Show>
+                    <Show when={entry.tokens !== undefined}>
+                      <text>
+                        {"  "}
+                        <span style={{ fg: pal().primary }}>{t("tokens.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{fmtTokens(entry.tokens!)}</span>
+                      </text>
+                    </Show>
                     <Show when={entry.prompt}>
                       {(() => {
                         const raw = entry.prompt
@@ -728,30 +799,6 @@ function SubAgentPanel(props: {
                           </>
                         )
                       })()}
-                    </Show>
-                    <Show when={entry.model}>
-                      <text>
-                        {"  "}
-                        <span style={{ fg: pal().primary }}>{t("model.label")}: </span>
-                        <span style={{ fg: pal().muted }}>
-                          {truncate(entry.model!, valueCols(t("model.label")))}
-                        </span>
-                      </text>
-                    </Show>
-                    <Show when={entry.command}>
-                      <text>
-                        {"  "}
-                        <span style={{ fg: pal().primary }}>{t("cmd.label")}: </span>
-                        <span style={{ fg: pal().muted }}>
-                          {truncate(
-                            entry.command!
-                              .replace(/\n/g, " ")
-                              .replace(/\s+/g, " ")
-                              .trim(),
-                            valueCols(t("cmd.label")),
-                          )}
-                        </span>
-                      </text>
                     </Show>
                   </Show>
                 </>
