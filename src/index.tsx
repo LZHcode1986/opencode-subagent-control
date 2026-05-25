@@ -15,6 +15,7 @@ import {
   createEffect,
   onMount,
   onCleanup,
+  untrack,
   Show,
   For,
 } from "solid-js"
@@ -191,6 +192,8 @@ function SubAgentPanel(props: {
   theme: TuiThemeCurrent
   api: TuiPluginApi
   lang: () => Lang
+  maxEntries: () => number
+  sessionId: string
 }): JSX.Element {
   const t = (key: string) => I18N[props.lang()][key] ?? key
 
@@ -311,6 +314,111 @@ function SubAgentPanel(props: {
     })
   })
 
+  // ── session‑switch & initial‑load scan ──
+  // Watches sessionId → clears old entries + rescans messages for the new session.
+  // A brief setTimeout ensures messages are available on first load.
+  createEffect(() => {
+    const sid = props.sessionId
+    const t = setTimeout(() => {
+      untrack(() => {
+        const next = new Map<string, SubEntry>()
+        try {
+          const msgs = props.api.state.session.messages(sid)
+          if (msgs && (msgs as any[]).length) {
+            for (const msg of msgs) {
+              const parts = props.api.state.part(msg.id) ?? []
+              for (const partRaw of parts) {
+                const part = partRaw as Record<string, unknown>
+
+                if (part.type === "subtask") {
+                  const agent = String(part.agent ?? "?")
+                  const prompt = String(part.prompt ?? "")
+                  const desc = String(part.description ?? "")
+                  const title =
+                    desc ||
+                    truncate(
+                      prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(),
+                      40,
+                    )
+                  const command =
+                    part.command !== undefined ? String(part.command) : undefined
+                  const m =
+                    part.model as
+                      | { providerID?: string; modelID?: string }
+                      | undefined
+                  const model =
+                    m?.providerID && m?.modelID
+                      ? `${m.providerID}/${m.modelID}`
+                      : undefined
+                  const id = `sub:${String(part.id ?? "")}`
+                  if (part.id) {
+                    next.set(id, {
+                      id,
+                      title,
+                      agent,
+                      prompt,
+                      command,
+                      model,
+                      status: "done",
+                      startedAt: 0,
+                      endedAt: 1,
+                    })
+                  }
+                } else if (part.type === "tool") {
+                  const tool = String((part as any).tool ?? "")
+                  if (tool !== "task" && tool !== "delegate") continue
+                  const st = (part as any).state as
+                    | Record<string, unknown>
+                    | undefined
+                  const rawStatus = String(st?.status ?? "")
+                  let status: SubStatus = "done"
+                  if (rawStatus === "error") status = "error"
+                  const input = st?.input as Record<string, unknown> | undefined
+                  const agent = String(
+                    (part as any).subagent_type ?? input?.subagent_type ?? tool,
+                  )
+                  const prompt = String(
+                    input?.prompt ?? (part as any).description ?? "",
+                  )
+                  const desc =
+                    input?.description !== undefined
+                      ? String(input.description)
+                      : ""
+                  const title =
+                    desc ||
+                    truncate(
+                      prompt.replace(/\n/g, " ").trim(),
+                      40,
+                    )
+                  const command =
+                    input?.command !== undefined
+                      ? String(input.command)
+                      : undefined
+                  const id = `tool:${String(part.id ?? "")}`
+                  if (part.id) {
+                    next.set(id, {
+                      id,
+                      title,
+                      agent,
+                      prompt,
+                      command,
+                      status,
+                      startedAt: 0,
+                      endedAt: 1,
+                    })
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+        setEntryMap(next)
+        bump()
+      })
+    }, 150)
+    onCleanup(() => clearTimeout(t))
+  })
+
   // ── palette ──
   const pal = createMemo(() => {
     const th = props.theme as Record<string, unknown>
@@ -335,6 +443,9 @@ function SubAgentPanel(props: {
       return (b.endedAt ?? 0) - (a.endedAt ?? 0)
     })
   })
+
+  const visibleList = createMemo(() => entryList().slice(0, props.maxEntries()))
+  const hiddenCount = createMemo(() => Math.max(0, entryList().length - props.maxEntries()))
 
   const entries = createMemo(() => {
     const nowVal = now()
@@ -459,7 +570,7 @@ function SubAgentPanel(props: {
             </text>
           }
         >
-          <For each={entryList()}>
+          <For each={visibleList()}>
             {(entry) => {
               const isExpanded = () => expanded().has(entry.id)
               const isRunning = entry.status === "running"
@@ -483,12 +594,14 @@ function SubAgentPanel(props: {
                   : visualWidth(fmtDurationShort(elapsed(), isRunning)) + 1
               const avail = () => Math.max(6, panelWidth() - 6 - suffixW())
               const labelText = () => {
-                if (avail() >= 30 && entry.title && entry.title !== entry.agent) {
-                  const maxTitle = avail() - visualWidth(" - ") - visualWidth(entry.agent)
-                  if (maxTitle >= 4)
-                    return truncate(entry.title, maxTitle) + " - " + entry.agent
+                const a = avail()
+                const agentW = visualWidth(entry.agent)
+                const minCombined = 4 + visualWidth(" - ") + agentW // at least 4 chars of title
+                if (a >= minCombined && entry.title && entry.title !== entry.agent) {
+                  const maxTitle = a - visualWidth(" - ") - agentW
+                  return truncate(entry.title, maxTitle) + " - " + entry.agent
                 }
-                return truncate(entry.agent, avail())
+                return truncate(entry.agent, a)
               }
 
               return (
@@ -559,6 +672,11 @@ function SubAgentPanel(props: {
               )
             }}
           </For>
+          <Show when={hiddenCount() > 0}>
+            <text style={{ fg: pal().muted }}>
+              {"  "}&hellip;and {hiddenCount()} more
+            </text>
+          </Show>
         </Show>
       </Show>
     </box>
@@ -572,15 +690,23 @@ function SubAgentPanel(props: {
 interface SharedSignals {
   lang: () => Lang
   setLang: (l: Lang) => void
+  maxEntries: () => number
+  setMaxEntries: (n: number) => void
 }
 
 function createSidebarSlot(api: TuiPluginApi, sig: SharedSignals): TuiSlotPlugin {
   return {
     order: 60,
     slots: {
-      sidebar_content(ctx: TuiSlotContext): JSX.Element {
+      sidebar_content(ctx: TuiSlotContext, input: { session_id: string }): JSX.Element {
         return (
-          <SubAgentPanel theme={ctx.theme.current} api={api} lang={sig.lang} />
+          <SubAgentPanel
+            theme={ctx.theme.current}
+            api={api}
+            lang={sig.lang}
+            maxEntries={sig.maxEntries}
+            sessionId={input.session_id}
+          />
         )
       },
     },
@@ -595,8 +721,11 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
   const initialLang: Lang =
     stored === "zh" || stored === "en" ? stored : detectLang()
   const [lang, setLang] = createSignal<Lang>(initialLang)
+  const [maxEntries, setMaxEntries] = createSignal(
+    parseInt(String(api.kv.get(`${KV_PREFIX}.max_entries`, "10")), 10) || 10
+  )
 
-  const signals: SharedSignals = { lang, setLang }
+  const signals: SharedSignals = { lang, setLang, maxEntries, setMaxEntries }
 
   api.slots.register(createSidebarSlot(api, signals))
 
@@ -622,6 +751,30 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
               api.ui.toast({
                 message: l === "zh" ? "语言: 中文" : "Language: English",
               })
+              dialog?.clear()
+            }}
+          />
+        ))
+      },
+    },
+    {
+      title: "Sub-Agent Monitor: Max Entries",
+      value: "subagent-max",
+      description: "Set max visible sub-agent entries in sidebar",
+      slash: { name: "subagent-max" },
+      onSelect: (dialog) => {
+        dialog?.replace(() => (
+          <api.ui.DialogPrompt
+            title="Max Visible Entries"
+            description={() => (
+              <text>Number of entries to show in the sidebar (1–50)</text>
+            )}
+            value={String(maxEntries())}
+            onConfirm={(val) => {
+              const n = Math.max(1, Math.min(50, parseInt(val, 10) || 10))
+              setMaxEntries(n)
+              api.kv.set(`${KV_PREFIX}.max_entries`, n)
+              api.ui.toast({ message: `Max entries: ${n}` })
               dialog?.clear()
             }}
           />
