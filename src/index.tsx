@@ -240,8 +240,13 @@ function SubAgentPanel(props: {
       const desc = String(part.description ?? "")
       const title = desc || truncate(prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(), 40)
       const command = part.command !== undefined ? String(part.command) : undefined
-      const m = part.model as { providerID?: string; modelID?: string } | undefined
-      const model = m?.providerID && m?.modelID ? `${m.providerID}/${m.modelID}` : undefined
+      const m = part.model as Record<string, unknown> | undefined
+      const model =
+        m
+          ? (m.providerID ?? m.provider ?? m.providerId) && (m.modelID ?? m.model ?? m.modelId)
+            ? `${m.providerID ?? m.provider ?? m.providerId}/${m.modelID ?? m.model ?? m.modelId}`
+            : undefined
+          : undefined
       const id = `sub:${String(part.id ?? crypto.randomUUID())}`
       upsertEntry({ id, title, agent, prompt, command, model, status: "running" })
     }
@@ -342,14 +347,12 @@ function SubAgentPanel(props: {
                     )
                   const command =
                     part.command !== undefined ? String(part.command) : undefined
-                  const m =
-                    part.model as
-                      | { providerID?: string; modelID?: string }
-                      | undefined
-                  const model =
-                    m?.providerID && m?.modelID
-                      ? `${m.providerID}/${m.modelID}`
+                  const m = part.model as Record<string, unknown> | undefined
+                  const model = m
+                    ? (m.providerID ?? m.provider ?? m.providerId) && (m.modelID ?? m.model ?? m.modelId)
+                      ? `${m.providerID ?? m.provider ?? m.providerId}/${m.modelID ?? m.model ?? m.modelId}`
                       : undefined
+                    : undefined
                   const id = `sub:${String(part.id ?? "")}`
                   if (part.id) {
                     next.set(id, {
@@ -514,7 +517,7 @@ function SubAgentPanel(props: {
   })
 
   const valueCols = (label: string) =>
-    Math.max(4, panelWidth() - 4 - visualWidth(label + ": "))
+    Math.max(4, panelWidth() - 2 - visualWidth(label + ": "))
 
   // ── render ──
   return (
@@ -566,7 +569,7 @@ function SubAgentPanel(props: {
           when={anyEntry()}
           fallback={
             <text style={{ fg: pal().muted }}>
-              {"  "}&gt; {t("status.none")}
+              {"  "}&gt; {t("status.none")}  {/* empty indent kept for visual balance */}
             </text>
           }
         >
@@ -592,7 +595,7 @@ function SubAgentPanel(props: {
                 entry.endedAt === undefined && elapsed() < 2000
                   ? 0
                   : visualWidth(fmtDurationShort(elapsed(), isRunning)) + 1
-              const avail = () => Math.max(6, panelWidth() - 6 - suffixW())
+              const avail = () => Math.max(6, panelWidth() - 4 - suffixW())
               const labelText = () => {
                 const a = avail()
                 const agentW = visualWidth(entry.agent)
@@ -606,9 +609,8 @@ function SubAgentPanel(props: {
 
               return (
                 <>
-                  {/* entry line — inline ternaries read signals directly */}
+                  {/* entry line — left-aligned */}
                   <text onMouseUp={() => toggleExpand(entry.id)}>
-                    {"  "}
                     <span style={{ fg: pal().muted }}>
                       {isExpanded() ? "\u25bc" : "\u25b6"}
                     </span>
@@ -626,26 +628,62 @@ function SubAgentPanel(props: {
                     ) : null}
                   </text>
 
-                  {/* expanded detail — i18n labels */}
+                  {/* expanded detail — 2‑line prompt, i18n labels */}
                   <Show when={isExpanded()}>
                     <Show when={entry.prompt}>
-                      <text>
-                        {"    "}
-                        <span style={{ fg: pal().primary }}>{t("prompt.label")}: </span>
-                        <span style={{ fg: pal().text }}>
-                          {truncate(
-                            entry.prompt
-                              .replace(/\n/g, " ")
-                              .replace(/\s+/g, " ")
-                              .trim(),
-                            valueCols(t("prompt.label"))
-                          )}
-                        </span>
-                      </text>
+                      {(() => {
+                        const raw = entry.prompt
+                          .replace(/\n/g, " ")
+                          .replace(/\s+/g, " ")
+                          .trim()
+                        const labelW = visualWidth(t("prompt.label") + ": ")
+                        const cap1 = panelWidth() - 2 - labelW
+                        if (visualWidth(raw) <= cap1) {
+                          return (
+                            <text>
+                              {"  "}
+                              <span style={{ fg: pal().primary }}>{t("prompt.label")}: </span>
+                              <span style={{ fg: pal().muted }}>{raw}</span>
+                            </text>
+                          )
+                        }
+                        // Line 1
+                        let c1 = 0, i1 = 0
+                        for (const ch of raw) {
+                          const w = charColumns(ch)
+                          if (c1 + w > cap1) break
+                          c1 += w
+                          i1 += ch.length
+                        }
+                        let si = i1
+                        while (si > 0 && si > i1 - 10 && raw[si - 1] !== " ") si--
+                        if (si > 0) i1 = si
+
+                        const l1 = raw.slice(0, i1).trimEnd() + "\u2026"
+                        const rest = raw.slice(i1).trimStart()
+
+                        // Line 2 — aligned under prompt value, truncated
+                        const cap2 = panelWidth() - 4
+                        return (
+                          <>
+                            <text>
+                              {"  "}
+                              <span style={{ fg: pal().primary }}>{t("prompt.label")}: </span>
+                              <span style={{ fg: pal().muted }}>{l1}</span>
+                            </text>
+                            <text>
+                              {"    "}
+                              <span style={{ fg: pal().muted }}>
+                                {truncate(rest, cap2)}
+                              </span>
+                            </text>
+                          </>
+                        )
+                      })()}
                     </Show>
                     <Show when={entry.model}>
                       <text>
-                        {"    "}
+                        {"  "}
                         <span style={{ fg: pal().primary }}>{t("model.label")}: </span>
                         <span style={{ fg: pal().muted }}>
                           {truncate(entry.model!, valueCols(t("model.label")))}
@@ -654,7 +692,7 @@ function SubAgentPanel(props: {
                     </Show>
                     <Show when={entry.command}>
                       <text>
-                        {"    "}
+                        {"  "}
                         <span style={{ fg: pal().primary }}>{t("cmd.label")}: </span>
                         <span style={{ fg: pal().muted }}>
                           {truncate(
@@ -662,7 +700,7 @@ function SubAgentPanel(props: {
                               .replace(/\n/g, " ")
                               .replace(/\s+/g, " ")
                               .trim(),
-                            valueCols(t("cmd.label"))
+                            valueCols(t("cmd.label")),
                           )}
                         </span>
                       </text>
@@ -674,7 +712,7 @@ function SubAgentPanel(props: {
           </For>
           <Show when={hiddenCount() > 0}>
             <text style={{ fg: pal().muted }}>
-              {"  "}&hellip;and {hiddenCount()} more
+              &hellip;and {hiddenCount()} more
             </text>
           </Show>
         </Show>
