@@ -489,7 +489,10 @@ function SubAgentPanel(props: {
 
                     const ended = status === "done" || status === "error"
                     next.set(id, {
-                      id, title, agent, prompt, tokens, sessionId: scanSubSid,
+                      id, title, agent, prompt,
+                      // Preserve existing values (from handleSessionEnd / KV) — scan must not overwrite
+                      tokens: exists?.tokens ?? tokens,
+                      sessionId: exists?.sessionId ?? scanSubSid,
                       status,
                       startedAt: exists?.startedAt || Date.now(),
                       endedAt: ended ? (exists?.endedAt || Date.now()) : undefined,
@@ -674,7 +677,7 @@ function SubAgentPanel(props: {
               // Entry label: when collapsed show "title - agent", when expanded just title
               const tokenText = () =>
                 !isExpanded() && entry.tokens !== undefined && entry.tokens > 0
-                  ? `\u00b7 ${fmtTokens(entry.tokens!)}`
+                  ? ` ${fmtTokens(entry.tokens!)}`
                   : ""
               const timeText = () =>
                 !isExpanded() && (elapsed() >= 2000 || entry.endedAt !== undefined)
