@@ -12,6 +12,7 @@ import type {
 import {
   createMemo,
   createSignal,
+  createEffect,
   onMount,
   onCleanup,
   Show,
@@ -27,6 +28,7 @@ type SubStatus = "running" | "done" | "error"
 
 interface SubEntry {
   id: string
+  title: string
   agent: string
   prompt: string
   command?: string
@@ -34,6 +36,37 @@ interface SubEntry {
   status: SubStatus
   startedAt: number
   endedAt?: number
+}
+
+type Lang = "zh" | "en"
+
+// ===================================================================
+// i18n
+// ===================================================================
+
+const I18N: Record<Lang, Record<string, string>> = {
+  zh: {
+    "panel.title": "子任务",
+    "status.none": "暂无子任务",
+    "prompt.label": "描述",
+    "model.label": "模型",
+    "cmd.label": "命令",
+  },
+  en: {
+    "panel.title": "Sub-Agents",
+    "status.none": "No sub-agents yet",
+    "prompt.label": "prompt",
+    "model.label": "model",
+    "cmd.label": "cmd",
+  },
+}
+
+declare const process: { env: Record<string, string | undefined> } | undefined
+
+function detectLang(): Lang {
+  const env = process?.env?.OPENCODE_LANG ?? process?.env?.LANG ?? ""
+  if (env.startsWith("zh")) return "zh"
+  return "en"
 }
 
 // ===================================================================
@@ -133,7 +166,7 @@ function desaturateTo(raw: unknown, maxSat: number, fallback: string): string {
     const mid = (lo + hi) / 2
     const nr = Math.round(c.r + (luma - c.r) * mid)
     const ng = Math.round(c.g + (luma - c.g) * mid)
-    const nb = Math.round(c.b + (luma - c.b) * hi)
+    const nb = Math.round(c.b + (luma - c.b) * mid)
     if (saturation(nr, ng, nb) > maxSat) lo = mid
     else hi = mid
   }
@@ -157,12 +190,16 @@ const MAX_SAT = 0.28
 function SubAgentPanel(props: {
   theme: TuiThemeCurrent
   api: TuiPluginApi
+  lang: () => Lang
 }): JSX.Element {
+  const t = (key: string) => I18N[props.lang()][key] ?? key
+
   const [panelWidth, setPanelWidth] = createSignal(28)
   const [open, setOpen] = createSignal(true)
   const [expanded, setExpanded] = createSignal<Set<string>>(new Set())
   const [now, setNow] = createSignal(Date.now())
   const [entryMap, setEntryMap] = createSignal<Map<string, SubEntry>>(new Map())
+  const [renderTick, setRenderTick] = createSignal(0)
 
   let boxEl: any
 
@@ -174,8 +211,8 @@ function SubAgentPanel(props: {
       const existing = prev.get(partial.id)
       const next = new Map(prev)
       const nowTs = Date.now()
-      const status = partial.status
-      const ended = status === "done" || status === "error"
+      const e = partial.status
+      const ended = e === "done" || e === "error"
       next.set(partial.id, {
         ...(existing ?? { startedAt: nowTs }),
         ...partial,
@@ -196,44 +233,46 @@ function SubAgentPanel(props: {
     // SubtaskPart
     if (part.type === "subtask") {
       const agent = String(part.agent ?? "?")
-      const prompt = String(part.prompt ?? part.description ?? "")
+      const prompt = String(part.prompt ?? "")
+      const desc = String(part.description ?? "")
+      const title = desc || truncate(prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(), 40)
       const command = part.command !== undefined ? String(part.command) : undefined
-      const modelRec = part.model as { providerID?: string; modelID?: string } | undefined
-      const model = modelRec?.providerID && modelRec?.modelID
-        ? `${modelRec.providerID}/${modelRec.modelID}`
-        : undefined
+      const m = part.model as { providerID?: string; modelID?: string } | undefined
+      const model = m?.providerID && m?.modelID ? `${m.providerID}/${m.modelID}` : undefined
       const id = `sub:${String(part.id ?? crypto.randomUUID())}`
-      upsertEntry({ id, agent, prompt, command, model, status: "running" })
+      upsertEntry({ id, title, agent, prompt, command, model, status: "running" })
     }
 
     // ToolPart
     if (part.type === "tool") {
       const tool = String(part.tool ?? "")
       if (tool !== "task" && tool !== "delegate") return
-      const state = part.state as Record<string, unknown> | undefined
-      const rawStatus = String(state?.status ?? "")
+      const st = part.state as Record<string, unknown> | undefined
+      const rawStatus = String(st?.status ?? "")
       let status: SubStatus = "running"
       if (rawStatus === "completed") status = "done"
       else if (rawStatus === "error") status = "error"
-      const input = state?.input as Record<string, unknown> | undefined
+      const input = st?.input as Record<string, unknown> | undefined
       const agent = String(part.subagent_type ?? input?.subagent_type ?? tool)
-      const prompt = String(input?.description ?? input?.prompt ?? part.description ?? "")
+      const prompt = String(input?.prompt ?? part.description ?? "")
+      const desc = input?.description !== undefined ? String(input.description) : ""
+      const title = desc || truncate(prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(), 40)
       const command = input?.command !== undefined ? String(input.command) : undefined
       const id = `tool:${String(part.id ?? crypto.randomUUID())}`
-      upsertEntry({ id, agent, prompt, command, status })
+      upsertEntry({ id, title, agent, prompt, command, status })
     }
   }
 
   const handleSessionEnd = (event: unknown, status: SubStatus) => {
     const e = event as Record<string, unknown>
     const props_ = e.properties as Record<string, unknown> | undefined
-    const sessionID = String(props_?.sessionID ?? "")
-    if (!sessionID) return
+    const sid = String(props_?.sessionID ?? "")
+    if (!sid) return
     setEntryMap((prev) => {
       let changed = false
       const next = new Map(prev)
       for (const [id, entry] of next) {
-        if (entry.status === "running" && id.includes(sessionID)) {
+        if (entry.status === "running" && id.includes(sid)) {
           next.set(id, { ...entry, status, endedAt: Date.now() })
           changed = true
         }
@@ -242,16 +281,31 @@ function SubAgentPanel(props: {
     })
   }
 
-  onMount(() => {
-    const timer = setInterval(() => setNow(Date.now()), 500)
+  // ── bumpRenderTick: force re-render (visual-cache pattern) ──
+  const bump = () => setRenderTick((v) => v + 1)
 
-    const unsubPart = props.api.event.on("message.part.updated", handlePartUpdated)
-    const unsubIdle = props.api.event.on("session.idle", (e) => handleSessionEnd(e, "done"))
-    const unsubError = props.api.event.on("session.error", (e) => handleSessionEnd(e, "error"))
+  onMount(() => {
+    const timer = setInterval(() => { setNow(Date.now()); bump() }, 500)
+    bump()
+
+    const unsubPart = props.api.event.on("message.part.updated", (e) => {
+      handlePartUpdated(e)
+      bump()
+    })
+    const unsubMsg = props.api.event.on("message.updated", () => bump())
+    const unsubIdle = props.api.event.on("session.idle", (e) => {
+      handleSessionEnd(e, "done")
+      bump()
+    })
+    const unsubError = props.api.event.on("session.error", (e) => {
+      handleSessionEnd(e, "error")
+      bump()
+    })
 
     onCleanup(() => {
       clearInterval(timer)
       unsubPart()
+      unsubMsg()
       unsubIdle()
       unsubError()
     })
@@ -259,8 +313,8 @@ function SubAgentPanel(props: {
 
   // ── palette ──
   const pal = createMemo(() => {
-    const t = props.theme as Record<string, unknown>
-    const sat = (k: string, fb: string) => desaturateTo(t[k], MAX_SAT, fb)
+    const th = props.theme as Record<string, unknown>
+    const sat = (k: string, fb: string) => desaturateTo(th[k], MAX_SAT, fb)
     return {
       primary: sat("primary", FALLBACK.primary),
       text: sat("text", FALLBACK.text),
@@ -273,27 +327,34 @@ function SubAgentPanel(props: {
   })
 
   // ── derived signals ──
-  const entries = createMemo(() => {
-    const nowVal = now()
-    return [...entryMap().values()]
-      .map((e) => ({
-        ...e,
-        elapsed: (e.endedAt ?? nowVal) - e.startedAt,
-      }))
-      .sort((a, b) => {
-        if (a.status !== b.status) return a.status === "running" ? -1 : 1
-        if (a.status === "running") return a.startedAt - b.startedAt
-        return (b.endedAt ?? 0) - (a.endedAt ?? 0)
-      })
+  // Stable list — only changes when entryMap changes
+  const entryList = createMemo(() => {
+    return [...entryMap().values()].sort((a, b) => {
+      if (a.status !== b.status) return a.status === "running" ? -1 : 1
+      if (a.status === "running") return a.startedAt - b.startedAt
+      return (b.endedAt ?? 0) - (a.endedAt ?? 0)
+    })
   })
 
-  const doneCount = createMemo(() => entries().filter((e) => e.status === "done").length)
-  const runningCount = createMemo(() => entries().filter((e) => e.status === "running").length)
-  const errCount = createMemo(() => entries().filter((e) => e.status === "error").length)
-  const anyEntry = () => entries().length > 0
+  const entries = createMemo(() => {
+    const nowVal = now()
+    return entryList().map((e) => ({
+      ...e,
+      elapsed: (e.endedAt ?? nowVal) - e.startedAt,
+    }))
+  })
+
+  const doneCount = createMemo(() => entryList().filter((e) => e.status === "done").length)
+  const runningCount = createMemo(() => entryList().filter((e) => e.status === "running").length)
+  const errCount = createMemo(() => entryList().filter((e) => e.status === "error").length)
+  const anyEntry = () => entryList().length > 0
 
   const maxElapsed = createMemo(() => {
-    const vals = entries().map((e) => e.elapsed)
+    const nowVal = now()
+    const vals = entryList().map((e) => {
+      const dur = (e.endedAt ?? nowVal) - e.startedAt
+      return dur
+    })
     return vals.length ? Math.max(...vals) : 0
   })
 
@@ -306,25 +367,24 @@ function SubAgentPanel(props: {
     })
   }
 
-  const sep = () => "\u2500".repeat(Math.max(1, panelWidth() - 4))
+  const sep = () => "\u2500".repeat(Math.max(1, panelWidth()))
 
-  // ── decomposed header parts for colored spans ──
-  const openIcon = () => open() ? "\u25bc" : "\u25b6"
-  const versionStr = () => open() ? ` v${PLUGIN_VERSION}` : ""
-  const summaryDot = () => "\u25cf"
-
+  // ── header parts for colored spans ──
   const summaryParts = createMemo(() => {
     if (!anyEntry()) return null
+    const dot = "\u25cf"
     return {
-      done: `${summaryDot()}${doneCount()}`,
-      running: runningCount() > 0 ? `${summaryDot()}${runningCount()}` : null,
-      err: errCount() > 0 ? `${summaryDot()}${errCount()}` : null,
+      done: `${dot}${doneCount()}`,
+      running: runningCount() > 0 ? `${dot}${runningCount()}` : null,
+      err: errCount() > 0 ? `${dot}${errCount()}` : null,
       duration: fmtDurationShort(maxElapsed(), false),
     }
   })
 
   const leftCols = createMemo(() => {
-    return visualWidth(openIcon()) + 1 + visualWidth("Sub-Agents") + visualWidth(versionStr())
+    const icon = open() ? "\u25bc" : "\u25b6"
+    const ver = open() ? ` v${PLUGIN_VERSION}` : ""
+    return visualWidth(icon) + 1 + visualWidth(t("panel.title")) + visualWidth(ver)
   })
 
   const summaryCols = createMemo(() => {
@@ -342,10 +402,10 @@ function SubAgentPanel(props: {
     return Math.max(1, panelWidth() - leftCols() - 1 - summaryCols())
   })
 
-  /** Available columns for a value in an expanded field row (after indent + label). */
   const valueCols = (label: string) =>
     Math.max(4, panelWidth() - 4 - visualWidth(label + ": "))
 
+  // ── render ──
   return (
     <box
       border={false}
@@ -357,17 +417,31 @@ function SubAgentPanel(props: {
         setPanelWidth((prev) => (prev === w ? prev : w))
       }}
     >
-      {/* ── header: colored spans (no <Show> inside <text>) ── */}
-      <text onMouseUp={() => setOpen((o) => !o)}>
-        <span style={{ fg: pal().muted }}>{openIcon()} </span>
-        <span style={{ fg: pal().primary }}>Sub-Agents</span>
-        <span style={{ fg: pal().border }}>{versionStr()}</span>
+      {/* ── header: same pattern as visual-cache's fold toggle ── */}
+      {/* renderTick in span forces the text element to re-evaluate */}
+      <text
+        onMouseUp={() => {
+          setOpen((o) => {
+            const n = !o
+            try { props.api.kv.set("subagent_monitor.open", n) } catch {}
+            return n
+          })
+          bump()
+        }}
+      >
+        <span style={{ fg: pal().muted }}>{renderTick() >= 0 && open() ? "\u25bc " : "\u25b6 "}</span>
+        <span style={{ fg: pal().primary }}>{t("panel.title")}</span>
+        <span style={{ fg: pal().border }}>{open() ? ` v${PLUGIN_VERSION}` : ""}</span>
         {anyEntry() ? (
           <>
             <span style={{ fg: pal().muted }}>{" ".repeat(spacerCols())}</span>
             <span style={{ fg: pal().success }}>{summaryParts()!.done}</span>
-            {runningCount() > 0 && <span style={{ fg: pal().warning }}> {summaryParts()!.running}</span>}
-            {errCount() > 0 && <span style={{ fg: pal().error }}> {summaryParts()!.err}</span>}
+            {runningCount() > 0 && (
+              <span style={{ fg: pal().warning }}> {summaryParts()!.running}</span>
+            )}
+            {errCount() > 0 && (
+              <span style={{ fg: pal().error }}> {summaryParts()!.err}</span>
+            )}
             <span style={{ fg: pal().muted }}> {summaryParts()!.duration}</span>
           </>
         ) : null}
@@ -381,51 +455,77 @@ function SubAgentPanel(props: {
           when={anyEntry()}
           fallback={
             <text style={{ fg: pal().muted }}>
-              {"  "}&gt; No sub-agents yet
+              {"  "}&gt; {t("status.none")}
             </text>
           }
         >
-          <For each={entries()}>
+          <For each={entryList()}>
             {(entry) => {
               const isExpanded = () => expanded().has(entry.id)
               const isRunning = entry.status === "running"
               const isError = entry.status === "error"
+              const elapsed = () => (entry.endedAt ?? now()) - entry.startedAt
 
               const statusDot = "\u25cf"
-              const statusColor = isRunning ? pal().warning : isError ? pal().error : pal().success
+              const statusColor = isRunning
+                ? pal().warning
+                : isError
+                  ? pal().error
+                  : pal().success
 
-              const expandIcon = isExpanded() ? "\u25bc" : "\u25b6"
-              const timeStr = fmtDurationShort(entry.elapsed, isRunning)
-              const timeColor = isRunning ? pal().warning : isError ? pal().error : pal().muted
+              const timeColor = () =>
+                isRunning ? pal().warning : isError ? pal().error : pal().muted
 
-              const agentWidth = Math.max(6, panelWidth() - 2 - 1 - 1 - 1 - 1 - (timeStr ? visualWidth(timeStr) + 1 : 0))
+              // Entry label: "title - agent" when room, else just "agent"
+              const suffixW = () =>
+                entry.endedAt === undefined && elapsed() < 2000
+                  ? 0
+                  : visualWidth(fmtDurationShort(elapsed(), isRunning)) + 1
+              const avail = () => Math.max(6, panelWidth() - 6 - suffixW())
+              const labelText = () => {
+                if (avail() >= 30 && entry.title && entry.title !== entry.agent) {
+                  const maxTitle = avail() - visualWidth(" - ") - visualWidth(entry.agent)
+                  if (maxTitle >= 4)
+                    return truncate(entry.title, maxTitle) + " - " + entry.agent
+                }
+                return truncate(entry.agent, avail())
+              }
 
               return (
                 <>
-                  {/* entry line */}
+                  {/* entry line — inline ternaries read signals directly */}
                   <text onMouseUp={() => toggleExpand(entry.id)}>
                     {"  "}
-                    <span style={{ fg: pal().muted }}>{expandIcon}</span>
+                    <span style={{ fg: pal().muted }}>
+                      {isExpanded() ? "\u25bc" : "\u25b6"}
+                    </span>
                     {" "}
                     <span style={{ fg: statusColor }}>{statusDot}</span>
                     {" "}
-                    <span style={{ fg: pal().text }}>{truncate(entry.agent, agentWidth)}</span>
-                    <Show when={timeStr}>
-                      {" "}
-                      <span style={{ fg: timeColor }}>{timeStr}</span>
-                    </Show>
+                    <span style={{ fg: pal().text }}>{labelText()}</span>
+                    {elapsed() >= 2000 || entry.endedAt !== undefined ? (
+                      <>
+                        {" "}
+                        <span style={{ fg: timeColor() }}>
+                          {fmtDurationShort(elapsed(), isRunning)}
+                        </span>
+                      </>
+                    ) : null}
                   </text>
 
-                  {/* expanded detail */}
+                  {/* expanded detail — i18n labels */}
                   <Show when={isExpanded()}>
                     <Show when={entry.prompt}>
                       <text>
                         {"    "}
-                        <span style={{ fg: pal().primary }}>prompt: </span>
+                        <span style={{ fg: pal().primary }}>{t("prompt.label")}: </span>
                         <span style={{ fg: pal().text }}>
                           {truncate(
-                            entry.prompt.replace(/\n/g, " ").replace(/\s+/g, " ").trim(),
-                            valueCols("prompt")
+                            entry.prompt
+                              .replace(/\n/g, " ")
+                              .replace(/\s+/g, " ")
+                              .trim(),
+                            valueCols(t("prompt.label"))
                           )}
                         </span>
                       </text>
@@ -433,20 +533,23 @@ function SubAgentPanel(props: {
                     <Show when={entry.model}>
                       <text>
                         {"    "}
-                        <span style={{ fg: pal().primary }}>model: </span>
+                        <span style={{ fg: pal().primary }}>{t("model.label")}: </span>
                         <span style={{ fg: pal().muted }}>
-                          {truncate(entry.model!, valueCols("model"))}
+                          {truncate(entry.model!, valueCols(t("model.label")))}
                         </span>
                       </text>
                     </Show>
                     <Show when={entry.command}>
                       <text>
                         {"    "}
-                        <span style={{ fg: pal().primary }}>cmd: </span>
+                        <span style={{ fg: pal().primary }}>{t("cmd.label")}: </span>
                         <span style={{ fg: pal().muted }}>
                           {truncate(
-                            entry.command!.replace(/\n/g, " ").replace(/\s+/g, " ").trim(),
-                            valueCols("cmd")
+                            entry.command!
+                              .replace(/\n/g, " ")
+                              .replace(/\s+/g, " ")
+                              .trim(),
+                            valueCols(t("cmd.label"))
                           )}
                         </span>
                       </text>
@@ -466,21 +569,66 @@ function SubAgentPanel(props: {
 // Plugin entry
 // ===================================================================
 
-function createSidebarSlot(api: TuiPluginApi): TuiSlotPlugin {
+interface SharedSignals {
+  lang: () => Lang
+  setLang: (l: Lang) => void
+}
+
+function createSidebarSlot(api: TuiPluginApi, sig: SharedSignals): TuiSlotPlugin {
   return {
     order: 60,
     slots: {
-      sidebar_content(ctx: TuiSlotContext, input: { session_id: string }): JSX.Element {
+      sidebar_content(ctx: TuiSlotContext): JSX.Element {
         return (
-          <SubAgentPanel theme={ctx.theme.current} api={api} />
+          <SubAgentPanel theme={ctx.theme.current} api={api} lang={sig.lang} />
         )
       },
     },
   }
 }
 
+const KV_PREFIX = "subagent_monitor"
+
 const tui: TuiPlugin = async (api: TuiPluginApi) => {
-  api.slots.register(createSidebarSlot(api))
+  // ── language ──
+  const stored = String(api.kv.get(`${KV_PREFIX}.lang`, ""))
+  const initialLang: Lang =
+    stored === "zh" || stored === "en" ? stored : detectLang()
+  const [lang, setLang] = createSignal<Lang>(initialLang)
+
+  const signals: SharedSignals = { lang, setLang }
+
+  api.slots.register(createSidebarSlot(api, signals))
+
+  // ── slash command: /subagent-lang ──
+  api.command?.register(() => [
+    {
+      title: "Sub-Agent Monitor: Language",
+      value: "subagent-lang",
+      description: "Switch display language (中文 / English)",
+      slash: { name: "subagent-lang" },
+      onSelect: (dialog) => {
+        dialog?.replace(() => (
+          <api.ui.DialogSelect
+            title="Language / 语言"
+            options={[
+              { title: "中文", value: "zh" },
+              { title: "English", value: "en" },
+            ]}
+            onSelect={(opt) => {
+              const l = opt.value as Lang
+              setLang(l)
+              api.kv.set(`${KV_PREFIX}.lang`, l)
+              api.ui.toast({
+                message: l === "zh" ? "语言: 中文" : "Language: English",
+              })
+              dialog?.clear()
+            }}
+          />
+        ))
+      },
+    },
+  ])
 }
 
 const mod: TuiPluginModule & { id: string } = {
