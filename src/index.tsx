@@ -58,6 +58,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     "agent.label": "代理",
     "time.label": "耗时",
     "tokens.label": "上下文",
+    "session.label": "会话",
     "error.label": "错误",
   },
   en: {
@@ -67,6 +68,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     "agent.label": "agent",
     "time.label": "time",
     "tokens.label": "context",
+    "session.label": "session",
     "error.label": "error",
   },
 }
@@ -846,6 +848,13 @@ function SubAgentPanel(props: {
                       <span style={{ fg: pal().primary }}>{t("agent.label")}: </span>
                       <span style={{ fg: pal().muted }}>{entry.agent}</span>
                     </text>
+                    <Show when={entry.sessionId}>
+                      <text>
+                        {"  "}
+                        <span style={{ fg: pal().primary }}>{t("session.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{entry.sessionId}</span>
+                      </text>
+                    </Show>
                     <Show when={elapsed() >= 2000 || entry.endedAt !== undefined}>
                       <text>
                         {"  "}
