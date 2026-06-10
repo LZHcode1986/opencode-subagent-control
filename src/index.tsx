@@ -450,8 +450,8 @@ function SubAgentPanel(props: {
           const eaNorm = normalize(entry.agent)
           if (!eaNorm || !saNorm) continue
           if (!eaNorm.includes(saNorm) && !saNorm.includes(eaNorm)) continue
-          const gap = Math.abs((entry.startedAt || 0) - nowTs)
-          if (!best || gap < best.gap) best = { id, gap }
+          const gap = nowTs - (entry.startedAt || 0)
+          if (!best || gap > best.gap) best = { id, gap }
         }
 
         // Phase 2: if agent name has no overlap (e.g. category calls: agent="deep" vs sessionAgent="Sisyphus-Junior"),
@@ -460,8 +460,8 @@ function SubAgentPanel(props: {
           for (const [id, entry] of next) {
             if (entry.status !== "running") continue
             if (entry.sessionId) continue
-            const gap = Math.abs((entry.startedAt || 0) - nowTs)
-            if (!best || gap < best.gap) best = { id, gap }
+            const gap = nowTs - (entry.startedAt || 0)
+            if (!best || gap > best.gap) best = { id, gap }
           }
         }
 
