@@ -350,12 +350,31 @@ function SubAgentPanel(props: {
       if (!SUBAGENT_TOOLS.has(tool)) return
       const st = part.state as Record<string, unknown> | undefined
       const rawStatus = String(st?.status ?? "")
+
+      // Only create entries for tool calls that actually entered execution.
+      // "pending" / empty → state unknown yet, wait for next event
+      if (rawStatus === "pending" || rawStatus === "") return
+
+      // "error" → tool call failed, sub-agent never spawned.
+      // Only update an existing entry (e.g. previously running → now error),
+      // never create a new one.
+      if (rawStatus === "error") {
+        const id = `tool:${String(part.id ?? "")}`
+        if (!part.id) return
+        const existing = entryMap().get(id)
+        if (existing) {
+          upsertEntry({ id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
+        }
+        return
+      }
+
+      // rawStatus is "running" or "completed" — tool entered execution, track it.
+      const input = st?.input as Record<string, unknown> | undefined
       let status: SubStatus = "running"
       if (rawStatus === "completed") status = "done"
-      else if (rawStatus === "error") status = "error"
-      const input = st?.input as Record<string, unknown> | undefined
       // Background tasks: tool completion ≠ agent completion — keep running until session.idle
       if (input?.run_in_background === true && status === "done") status = "running"
+
       const agent = String((part as any).subagent_type ?? input?.subagent_type ?? input?.category ?? tool)
       const prompt = String(input?.prompt ?? (part as any).description ?? "")
       const desc = input?.description !== undefined ? String(input.description) : ""
@@ -419,7 +438,7 @@ function SubAgentPanel(props: {
         })
         changed = true
       }
-      if (!changed && sessionAgent && (sessionTokens || sessionCost || errorMsg)) {
+      if (!changed && sessionAgent) {
         const nowTs = Date.now()
         const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9-]/g, "")
         const saNorm = normalize(sessionAgent)
@@ -551,22 +570,31 @@ function SubAgentPanel(props: {
                     const id = `tool:${String(part.id ?? "")}`
                     if (!part.id) continue
 
-                    // Tool part has explicit state.status — only update if we have concrete new info
                     const st = (part as any).state as Record<string, unknown> | undefined
                     const rawStatus = String(st?.status ?? "")
+                    const exists = next.get(id)
+
+                    // Only create entries for tool calls that entered execution.
+                    // "pending" / empty: skip new entries; allow heuristics for existing ones below.
+                    if ((rawStatus === "pending" || rawStatus === "") && !exists) continue
+
+                    // "error": only update existing, never create a new entry
+                    if (rawStatus === "error") {
+                      if (exists && exists.status === "running") {
+                        next.set(id, { ...exists, status: "error", endedAt: Date.now() })
+                      }
+                      continue
+                    }
+
                     let status: SubStatus = "running"
                     if (rawStatus === "completed") status = "done"
-                    else if (rawStatus === "error") status = "error"
                     // Background tasks: tool completion ≠ agent completion — keep running until session.idle
                     if ((st?.input as Record<string, unknown> | undefined)?.run_in_background === true && status === "done") status = "running"
 
-                    const exists = next.get(id)
                     // Already settled → skip
                     if (exists && exists.status !== "running") continue
-                    // Running entry with no status improvement from part:
+                    // Running entry with no explicit status improvement from part:
                     // try message-level heuristics first, then time-based fallback.
-                    // Otherwise historical sub-agents restored from KV stay "running" forever
-                    // because api.state.part() may return empty state for past messages.
                     if (exists && status === "running") {
                       if (!rawStatus) {
                         const msgTokens = (msg as any)?.tokens as Record<string, unknown> | undefined
@@ -595,7 +623,7 @@ function SubAgentPanel(props: {
                     const scanSubSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
                     if (scanSubSid) tokens = readSessionTokens(scanSubSid)
 
-                    const ended = status === "done" || status === "error"
+                    const ended = status === "done"  // "error" handled above, never reaches here
                     next.set(id, {
                       id, title, agent, prompt,
                       // Preserve existing values (from handleSessionEnd / KV) — scan must not overwrite
