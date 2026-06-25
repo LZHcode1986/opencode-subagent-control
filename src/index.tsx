@@ -762,6 +762,28 @@ function SubAgentPanel(props: {
           } catch {}
           return next
         })
+        // Reconcile: check running entries against live child session status.
+        // Covers session.idle events missed while user was inside a child session.
+        setEntryMapRaw((prev) => {
+          let changed = false
+          const next = new Map(prev)
+          for (const [id, entry] of next) {
+            if (entry.status !== "running" || !entry.sessionId) continue
+            try {
+              const st = props.api.state.session.status(entry.sessionId)
+              if (!st || st.type !== "idle") continue
+              const tokens = readSessionTokens(entry.sessionId)
+              const cost = readSessionCost(entry.sessionId)
+              next.set(id, {
+                ...entry, status: "done" as SubStatus, endedAt: Date.now(),
+                tokens: tokens ?? entry.tokens,
+                cost: cost ?? entry.cost,
+              })
+              changed = true
+            } catch {}
+          }
+          return changed ? next : prev
+        })
         bump()
       })
     }, 150)
