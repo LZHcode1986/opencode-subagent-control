@@ -937,7 +937,7 @@ function SubAgentPanel(props: {
               const timeColor = () =>
                 isRunning ? pal().warning : isError ? pal().error : pal().muted
 
-              // Entry label: when collapsed show "title - agent", when expanded just title
+              // Entry label: collapsed shows title only, expanded shows title only too
               const tokenText = () =>
                 !isExpanded() && entry.tokens !== undefined && entry.tokens > 0
                   ? ` ${fmtTokens(entry.tokens!)}`
@@ -954,21 +954,14 @@ function SubAgentPanel(props: {
                 if (tk) w += visualWidth(tk)
                 return w
               }
-              const avail = () => Math.max(6, panelWidth() - 4 - suffixW())
-              const collapsedLabel = () => {
-                const a = avail()
-                const agentW = visualWidth(entry.agent)
-                const minCombined = 4 + visualWidth(" - ") + agentW
-                if (a >= minCombined && entry.title && entry.title !== entry.agent) {
-                  const maxTitle = a - visualWidth(" - ") - agentW
-                  return truncate(entry.title, maxTitle) + " - " + entry.agent
-                }
-                return truncate(entry.agent, a)
+              const labelAvail = () => Math.max(6, panelWidth() - 4 - suffixW())
+              const labelText = () => {
+                const max = labelAvail()
+                const text = entry.title || entry.agent
+                const truncated = truncate(text, max)
+                const pad = Math.max(0, max - visualWidth(truncated))
+                return truncated + " ".repeat(pad)
               }
-              const labelText = () =>
-                isExpanded()
-                  ? truncate(entry.title || entry.agent, Math.max(6, panelWidth() - 4))
-                  : collapsedLabel()
 
               return (
                 <>
