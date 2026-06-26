@@ -222,6 +222,13 @@ const LEFT_PAD = 4
 /** Detail row indent: two spaces */
 const INDENT = 2
 
+function safeErrorMsg(err: unknown): string {
+  if (!err) return ""
+  if (typeof err === "string") return err
+  if (typeof err === "object") return String((err as any).message || (err as any).code || "")
+  return ""
+}
+
 // ===================================================================
 // Sidebar component
 // ===================================================================
@@ -576,14 +583,14 @@ function SubAgentPanel(props: {
       sessionAgent = s?.agent
       if (status === "error") {
         const evtErr = props_?.error as Record<string, unknown> | undefined
-        errorMsg = String(evtErr?.message ?? evtErr ?? props_?.message ?? "")
+        errorMsg = safeErrorMsg(evtErr) || safeErrorMsg(props_?.message)
         if (!errorMsg) {
           const msgs = props.api.state.session.messages(sid)
           if (msgs) {
             for (let i = (msgs as any[]).length - 1; i >= 0; i--) {
               const m = (msgs as any[])[i]
               if (m.role === "assistant" && m.error) {
-                errorMsg = String((m.error as any).message ?? m.error)
+                errorMsg = safeErrorMsg(m.error)
                 break
               }
             }
@@ -961,6 +968,19 @@ function SubAgentPanel(props: {
 
   const sep = () => "\u2500".repeat(Math.max(1, panelWidth()))
 
+  // ── expanded detail right-align ──
+  const expandedMaxLabelW = createMemo(() => {
+    const labels = [
+      t("agent.label"), t("time.label"), t("tokens.label"),
+      t("error.label"), t("cost.label"), t("model.label"), t("todo.label"),
+    ]
+    return Math.max(...labels.map(l => visualWidth(l + ": ")))
+  })
+
+  const expandedPad = (label: string) => Math.max(0, expandedMaxLabelW() - visualWidth(label + ": "))
+
+  const expandedValAvail = () => Math.max(6, panelWidth() - INDENT - expandedMaxLabelW())
+
   // ── header parts for colored spans ──
   const summaryParts = createMemo(() => {
     if (!anyEntry()) return null
@@ -1158,17 +1178,19 @@ function SubAgentPanel(props: {
                     ) : null}
                   </text>
 
-                  {/* expanded detail — agent, time, context, prompt */}
+                  {/* expanded detail — right-aligned values */}
                   <Show when={isExpanded()}>
                     <text>
                       {"  "}
                       <span style={{ fg: pal().primary }}>{t("agent.label")}: </span>
+                      <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("agent.label")))}</span>
                       <span style={{ fg: pal().muted }}>{entry.agent}</span>
                     </text>
                     <Show when={elapsed() >= 2000 || entry.endedAt !== undefined}>
                       <text>
                         {"  "}
                         <span style={{ fg: pal().primary }}>{t("time.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("time.label")))}</span>
                         <span style={{ fg: pal().muted }}>
                           {fmtDurationShort(elapsed(), isRunning)}
                         </span>
@@ -1178,6 +1200,7 @@ function SubAgentPanel(props: {
                       <text>
                         {"  "}
                         <span style={{ fg: pal().primary }}>{t("tokens.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("tokens.label")))}</span>
                         <span style={{ fg: pal().muted }}>{fmtTokens(entry.tokens!)}</span>
                       </text>
                     </Show>
@@ -1185,13 +1208,15 @@ function SubAgentPanel(props: {
                       <text>
                         {"  "}
                         <span style={{ fg: pal().error }}>{t("error.label")}: </span>
-                        <span style={{ fg: pal().error }}>{truncate(entry.error!, Math.max(6, panelWidth() - INDENT - visualWidth(t("error.label") + ": ")))}</span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("error.label")))}</span>
+                        <span style={{ fg: pal().error }}>{truncate(String(entry.error), expandedValAvail())}</span>
                       </text>
                     </Show>
                     <Show when={entry.cost !== undefined}>
                       <text>
                         {"  "}
                         <span style={{ fg: pal().primary }}>{t("cost.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("cost.label")))}</span>
                         <span style={{ fg: pal().muted }}>${entry.cost!.toFixed(4)}</span>
                       </text>
                     </Show>
@@ -1199,13 +1224,15 @@ function SubAgentPanel(props: {
                       <text>
                         {"  "}
                         <span style={{ fg: pal().primary }}>{t("model.label")}: </span>
-                        <span style={{ fg: pal().muted }}>{truncate(entry.model!, Math.max(6, panelWidth() - INDENT - visualWidth(t("model.label") + ": ")))}</span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("model.label")))}</span>
+                        <span style={{ fg: pal().muted }}>{truncate(entry.model!, expandedValAvail())}</span>
                       </text>
                     </Show>
                     <Show when={entry.todoTotal !== undefined}>
                       <text>
                         {"  "}
                         <span style={{ fg: pal().primary }}>{t("todo.label")}: </span>
+                        <span style={{ fg: pal().muted }}>{" ".repeat(expandedPad(t("todo.label")))}</span>
                         <span style={{ fg: pal().muted }}>{entry.todoDone}/{entry.todoTotal}</span>
                       </text>
                     </Show>
