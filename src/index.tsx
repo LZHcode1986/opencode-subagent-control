@@ -56,7 +56,7 @@ const SUBAGENT_TOOLS = new Set(["task", "delegate", "call_omo_agent"])
 const I18N: Record<Lang, Record<string, string>> = {
   zh: {
     "panel.title": "子代理",
-    "status.none": "暂无子任务",
+    "status.none": "暂无子代理",
     "agent.label": "代理",
     "time.label": "耗时",
     "tokens.label": "上下文",
