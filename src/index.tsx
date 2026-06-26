@@ -1216,11 +1216,12 @@ function SubAgentPanel(props: {
               )
             }}
             </For>
-            <Show when={hiddenBelow() > 0}>
+            <Show when={hiddenBelow() > 0 || scrollOffset() > 0}>
               {(() => {
-                const left = `  \u2193 ${hiddenBelow()} ${t("scroll.more")}`
-                const right = `\u2191 ${t("scroll.top")}`
+                const showMore = hiddenBelow() > 0
                 const showTop = scrollOffset() > 0
+                const left = showMore ? `  \u2193 ${hiddenBelow()} ${t("scroll.more")}` : "  "
+                const right = `\u2191 ${t("scroll.top")}`
                 const pad = showTop ? Math.max(1, panelWidth() - visualWidth(left) - visualWidth(right)) : 0
                 return (
                   <box flexDirection="row">
