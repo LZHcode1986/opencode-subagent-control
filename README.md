@@ -24,10 +24,12 @@
 <div align="center"> 
 <strong>折叠态 · 简洁概览👇</strong> <br>
 <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse.png"></img>
+<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse_en.png"></img>
 </div>
 <div align="center"> 
 <strong>展开态 · 详细信息👇</strong> <br>
 <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand.png"></img>
+<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand_en.png"></img>
 </div>
 
 
