@@ -39,6 +39,10 @@
     "subagent",
     "subtask"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hotakus/opencode-subagent-magazine.git"
+  },
   "license": "MIT",
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.14.0",
