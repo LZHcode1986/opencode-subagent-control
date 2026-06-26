@@ -1,8 +1,9 @@
 <div align="center">
 <strong>
     <h1>OpenCode SubAgent Magazine</h1>
+    像弹匣一样装填！发射！<br><br>
     实时子代理监控 · TUI 侧边栏可视化<br>
-    自适应主题色 · 中/英双语 · 数据持久化
+    自适应主题色 · 低饱和设计语言 · 中/英双语 · 数据持久化
 </strong>
 <br>
 <br>
