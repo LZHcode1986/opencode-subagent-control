@@ -23,11 +23,11 @@ If you find this plugin useful, consider giving it a star ⭐ — thank you!<br>
 
 <div align="center"> 
 <strong>Collapsed · Quick Overview 👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse.png"></img>
+<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse_en.png"></img>
 </div>
 <div align="center"> 
 <strong>Expanded · Detailed Info 👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand.png"></img>
+<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand_en.png"></img>
 </div>
 
 
