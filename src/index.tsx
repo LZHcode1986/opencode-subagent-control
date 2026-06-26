@@ -322,52 +322,6 @@ function SubAgentPanel(props: {
     } catch {}
   }
 
-  // ── one-time migration: old per-session keys → session_data ──
-  const migrateSession = (sid: string) => {
-    try {
-      const raw = props.api.kv.get(`${KV_PREFIX}.entries.${sid}`, "")
-      if (!raw) return false
-      const data = loadSessionData()
-      if (data[sid]) return false // already migrated
-      const entries = JSON.parse(String(raw)) as SubEntry[]
-      const scroll = props.api.kv.get(`${KV_PREFIX}.scroll.${sid}`, 0) as number
-      const expanded = props.api.kv.get(`${KV_PREFIX}.expanded.${sid}`, "") as string
-      data[sid] = { ts: Date.now(), entries, scroll, expanded: expanded || "" }
-      saveSessionData(data)
-      // clear old per-session keys
-      props.api.kv.set(`${KV_PREFIX}.entries.${sid}`, "")
-      props.api.kv.set(`${KV_PREFIX}.scroll.${sid}`, 0)
-      props.api.kv.set(`${KV_PREFIX}.expanded.${sid}`, "")
-      return true
-    } catch { return false }
-  }
-
-  const migrateOldKeys = () => {
-    try {
-      const oldRaw = props.api.kv.get(`${KV_PREFIX}.sessions`, "{}")
-      const oldSessions: Record<string, number> = JSON.parse(String(oldRaw))
-      for (const [sid, ts] of Object.entries(oldSessions)) {
-        if (loadSessionData()[sid]) continue
-        const raw = props.api.kv.get(`${KV_PREFIX}.entries.${sid}`, "")
-        if (!raw) continue
-        const entries = JSON.parse(String(raw)) as SubEntry[]
-        const scroll = props.api.kv.get(`${KV_PREFIX}.scroll.${sid}`, 0) as number
-        const expanded = props.api.kv.get(`${KV_PREFIX}.expanded.${sid}`, "") as string
-        const data = loadSessionData()
-        data[sid] = { ts, entries, scroll, expanded: expanded || "" }
-        saveSessionData(data)
-        props.api.kv.set(`${KV_PREFIX}.entries.${sid}`, "")
-        props.api.kv.set(`${KV_PREFIX}.scroll.${sid}`, 0)
-        props.api.kv.set(`${KV_PREFIX}.expanded.${sid}`, "")
-      }
-      if (Object.keys(oldSessions).length > 0) {
-        props.api.kv.set(`${KV_PREFIX}.sessions`, "{}")
-      }
-    } catch {}
-  }
-
-  migrateOldKeys()
-  migrateSession(props.sessionId)
   cleanupOldSessions()
 
   const [entryMap, setEntryMapRaw] = createSignal(loadEntries(props.sessionId))
@@ -384,7 +338,9 @@ function SubAgentPanel(props: {
   }
 
   const [panelWidth, setPanelWidth] = createSignal(28)
-  const [open, setOpen] = createSignal(true)
+  const [open, setOpen] = createSignal(
+    (() => { try { return props.api.kv.get(`${KV_PREFIX}.open`, true) as boolean } catch { return true } })()
+  )
   const [expanded, setExpanded] = createSignal<string | undefined>(
     (() => { try { return loadSessionData()[props.sessionId]?.expanded || undefined } catch { return undefined } })()
   )
@@ -773,7 +729,6 @@ function SubAgentPanel(props: {
     const sid = props.sessionId
     const switched = sid !== lastSid
     lastSid = sid
-    if (switched) migrateSession(sid)
     const t = setTimeout(() => {
       untrack(() => {
         if (switched) {
@@ -1054,7 +1009,7 @@ function SubAgentPanel(props: {
         onMouseUp={() => {
           setOpen((o) => {
             const n = !o
-            try { props.api.kv.set("subagent_monitor.open", n) } catch {}
+            try { props.api.kv.set(`${KV_PREFIX}.open`, n) } catch {}
             return n
           })
           bump()
@@ -1325,7 +1280,7 @@ function createSidebarSlot(api: TuiPluginApi, sig: SharedSignals): TuiSlotPlugin
   }
 }
 
-const KV_PREFIX = "subagent_monitor"
+const KV_PREFIX = "subagent_magazine"
 
 const tui: TuiPlugin = async (api: TuiPluginApi) => {
   // ── language ──
@@ -1399,7 +1354,7 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
       description: "Show plugin version",
       slash: { name: "subagent-version" },
       onSelect: (dialog) => {
-        api.ui.toast({ message: `opencode-subagent-monitor v${PLUGIN_VERSION}` })
+        api.ui.toast({ message: `opencode-subagent-magazine v${PLUGIN_VERSION}` })
         dialog?.clear()
       },
     },
@@ -1417,7 +1372,7 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
 }
 
 const mod: TuiPluginModule & { id: string } = {
-  id: "opencode-subagent-monitor",
+  id: "opencode-subagent-magazine",
   tui,
 }
 
