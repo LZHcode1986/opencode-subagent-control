@@ -65,6 +65,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     "todo.label": "进度",
     "open.label": "进入会话",
     "cost.label": "费用",
+    "scroll.more": "更多",
+    "scroll.top": "回顶",
   },
   en: {
     "panel.title": "SubAgent",
@@ -77,6 +79,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     "todo.label": "todo",
     "open.label": "Open session",
     "cost.label": "cost",
+    "scroll.more": "more",
+    "scroll.top": "Top",
   },
 }
 
@@ -385,6 +389,7 @@ function SubAgentPanel(props: {
     (() => { try { return loadSessionData()[props.sessionId]?.expanded || undefined } catch { return undefined } })()
   )
   const [hoveredOpen, setHoveredOpen] = createSignal<string | undefined>(undefined)
+  const [hoveredTop, setHoveredTop] = createSignal(false)
   const [scrollOffset, setScrollOffset] = createSignal(
     (() => { try { return loadSessionData()[props.sessionId]?.scroll ?? 0 } catch { return 0 } })()
   )
@@ -1105,7 +1110,7 @@ function SubAgentPanel(props: {
           >
             <Show when={hiddenAbove() > 0}>
               <text style={{ fg: pal().muted }}>
-                {"  "}&uarr; {hiddenAbove()} more
+                {"  "}&uarr; {hiddenAbove()} {t("scroll.more")}
               </text>
             </Show>
             <For each={visibleList()}>
@@ -1257,9 +1262,29 @@ function SubAgentPanel(props: {
             }}
             </For>
             <Show when={hiddenBelow() > 0}>
-              <text style={{ fg: pal().muted }}>
-                {"  "}&darr; {hiddenBelow()} more
-              </text>
+              {(() => {
+                const left = `  \u2193 ${hiddenBelow()} ${t("scroll.more")}`
+                const right = `\u2191 ${t("scroll.top")}`
+                const showTop = scrollOffset() > 0
+                const pad = showTop ? Math.max(1, panelWidth() - visualWidth(left) - visualWidth(right)) : 0
+                return (
+                  <box flexDirection="row">
+                    <text style={{ fg: pal().muted }}>{left}</text>
+                    {showTop ? (
+                      <>
+                        <text style={{ fg: pal().muted }}>{" ".repeat(pad)}</text>
+                        <text
+                          onMouseOver={() => setHoveredTop(true)}
+                          onMouseOut={() => setHoveredTop(false)}
+                          onMouseUp={() => setScrollOffset(0)}
+                        >
+                          <span style={{ fg: hoveredTop() ? pal().warning : pal().muted }}>{right}</span>
+                        </text>
+                      </>
+                    ) : null}
+                  </box>
+                )
+              })()}
             </Show>
           </box>
         </Show>
