@@ -239,31 +239,131 @@ function SubAgentPanel(props: {
 }): JSX.Element {
   const t = (key: string) => I18N[props.lang()][key] ?? key
 
-  // ── kv persistence ──
-  // Entries survive component unmount/remount (e.g. Ctrl‑X Down / Up)
-  const kvEntryKey = (sid: string) => `${KV_PREFIX}.entries.${sid}`
+  // ── session data (single-key, true deletion on cleanup) ──
+  const SESSION_DATA_KEY = `${KV_PREFIX}.session_data`
+  const TTL_MS = 3 * 24 * 60 * 60 * 1000
 
-  const loadFromKv = (sid: string): Map<string, SubEntry> => {
+  interface SessionRecord {
+    ts: number
+    entries: SubEntry[]
+    scroll: number
+    expanded: string
+  }
+
+  const loadSessionData = (): Record<string, SessionRecord> => {
+    try {
+      const raw = props.api.kv.get(SESSION_DATA_KEY, "{}")
+      return JSON.parse(String(raw))
+    } catch { return {} }
+  }
+
+  const saveSessionData = (data: Record<string, SessionRecord>) => {
+    try { props.api.kv.set(SESSION_DATA_KEY, JSON.stringify(data)) } catch {}
+  }
+
+  const loadEntries = (sid: string): Map<string, SubEntry> => {
     const m = new Map<string, SubEntry>()
     try {
-      const raw = props.api.kv.get(kvEntryKey(sid), "")
-      if (raw) {
-        const arr = JSON.parse(String(raw)) as SubEntry[]
-        for (const e of arr) m.set(e.id, e)
+      const rec = loadSessionData()[sid]
+      if (rec?.entries) {
+        for (const e of rec.entries) m.set(e.id, e)
       }
     } catch {}
     return m
   }
 
   let persistTimer: ReturnType<typeof setTimeout> | undefined
-  const persistToKv = (sid: string, entries: Map<string, SubEntry>) => {
+  const persistEntries = (sid: string, entries: Map<string, SubEntry>) => {
     clearTimeout(persistTimer)
     persistTimer = setTimeout(() => {
-      try { props.api.kv.set(kvEntryKey(sid), JSON.stringify([...entries.values()])) } catch {}
+      try {
+        const data = loadSessionData()
+        data[sid] = { ...data[sid], ts: Date.now(), entries: [...entries.values()] }
+        saveSessionData(data)
+      } catch {}
     }, 200)
   }
 
-  const [entryMap, setEntryMapRaw] = createSignal(loadFromKv(props.sessionId))
+  const persistScroll = (sid: string, scroll: number) => {
+    try {
+      const data = loadSessionData()
+      data[sid] = { ...data[sid], ts: Date.now(), scroll }
+      saveSessionData(data)
+    } catch {}
+  }
+
+  const persistExpanded = (sid: string, expanded: string) => {
+    try {
+      const data = loadSessionData()
+      data[sid] = { ...data[sid], ts: Date.now(), expanded }
+      saveSessionData(data)
+    } catch {}
+  }
+
+  const cleanupOldSessions = () => {
+    try {
+      const data = loadSessionData()
+      const cutoff = Date.now() - TTL_MS
+      let changed = false
+      for (const sid of Object.keys(data)) {
+        if (data[sid].ts < cutoff) {
+          delete data[sid]
+          changed = true
+        }
+      }
+      if (changed) saveSessionData(data)
+    } catch {}
+  }
+
+  // ── one-time migration: old per-session keys → session_data ──
+  const migrateSession = (sid: string) => {
+    try {
+      const raw = props.api.kv.get(`${KV_PREFIX}.entries.${sid}`, "")
+      if (!raw) return false
+      const data = loadSessionData()
+      if (data[sid]) return false // already migrated
+      const entries = JSON.parse(String(raw)) as SubEntry[]
+      const scroll = props.api.kv.get(`${KV_PREFIX}.scroll.${sid}`, 0) as number
+      const expanded = props.api.kv.get(`${KV_PREFIX}.expanded.${sid}`, "") as string
+      data[sid] = { ts: Date.now(), entries, scroll, expanded: expanded || "" }
+      saveSessionData(data)
+      // clear old per-session keys
+      props.api.kv.set(`${KV_PREFIX}.entries.${sid}`, "")
+      props.api.kv.set(`${KV_PREFIX}.scroll.${sid}`, 0)
+      props.api.kv.set(`${KV_PREFIX}.expanded.${sid}`, "")
+      return true
+    } catch { return false }
+  }
+
+  const migrateOldKeys = () => {
+    try {
+      const oldRaw = props.api.kv.get(`${KV_PREFIX}.sessions`, "{}")
+      const oldSessions: Record<string, number> = JSON.parse(String(oldRaw))
+      for (const [sid, ts] of Object.entries(oldSessions)) {
+        if (loadSessionData()[sid]) continue
+        const raw = props.api.kv.get(`${KV_PREFIX}.entries.${sid}`, "")
+        if (!raw) continue
+        const entries = JSON.parse(String(raw)) as SubEntry[]
+        const scroll = props.api.kv.get(`${KV_PREFIX}.scroll.${sid}`, 0) as number
+        const expanded = props.api.kv.get(`${KV_PREFIX}.expanded.${sid}`, "") as string
+        const data = loadSessionData()
+        data[sid] = { ts, entries, scroll, expanded: expanded || "" }
+        saveSessionData(data)
+        props.api.kv.set(`${KV_PREFIX}.entries.${sid}`, "")
+        props.api.kv.set(`${KV_PREFIX}.scroll.${sid}`, 0)
+        props.api.kv.set(`${KV_PREFIX}.expanded.${sid}`, "")
+      }
+      if (Object.keys(oldSessions).length > 0) {
+        props.api.kv.set(`${KV_PREFIX}.sessions`, "{}")
+      }
+    } catch {}
+  }
+
+  migrateOldKeys()
+  migrateSession(props.sessionId)
+  cleanupOldSessions()
+
+  const [entryMap, setEntryMapRaw] = createSignal(loadEntries(props.sessionId))
 
   // Wrapped setter — also persists to kv on every mutation
   const setEntryMap = (
@@ -271,21 +371,19 @@ function SubAgentPanel(props: {
   ) => {
     setEntryMapRaw((prev) => {
       const next = typeof arg === "function" ? (arg as Function)(prev) : arg
-      persistToKv(props.sessionId, next)
+      persistEntries(props.sessionId, next)
       return next
     })
   }
 
   const [panelWidth, setPanelWidth] = createSignal(28)
   const [open, setOpen] = createSignal(true)
-  const expandedKey = `${KV_PREFIX}.expanded.${props.sessionId}`
   const [expanded, setExpanded] = createSignal<string | undefined>(
-    (() => { try { return props.api.kv.get(expandedKey, "") || undefined } catch { return undefined } })()
+    (() => { try { return loadSessionData()[props.sessionId]?.expanded || undefined } catch { return undefined } })()
   )
   const [hoveredOpen, setHoveredOpen] = createSignal<string | undefined>(undefined)
-  const scrollKey = `${KV_PREFIX}.scroll.${props.sessionId}`
   const [scrollOffset, setScrollOffset] = createSignal(
-    (() => { try { return props.api.kv.get(scrollKey, 0) as number } catch { return 0 } })()
+    (() => { try { return loadSessionData()[props.sessionId]?.scroll ?? 0 } catch { return 0 } })()
   )
   const [now, setNow] = createSignal(Date.now())
   const [renderTick, setRenderTick] = createSignal(0)
@@ -667,16 +765,17 @@ function SubAgentPanel(props: {
     const sid = props.sessionId
     const switched = sid !== lastSid
     lastSid = sid
+    if (switched) migrateSession(sid)
     const t = setTimeout(() => {
       untrack(() => {
         if (switched) {
-          const saved = (() => { try { return props.api.kv.get(`${KV_PREFIX}.scroll.${sid}`, 0) as number } catch { return 0 } })()
+          const saved = loadSessionData()[sid]?.scroll ?? 0
           setScrollOffset(saved)
         }
         // scan uses setEntryMapRaw — ephemeral data, not persisted to kv.
         // Only event-driven changes (handlePartUpdated, handleSessionEnd) persist.
         setEntryMapRaw((prev) => {
-          const next = switched ? loadFromKv(sid) : new Map(prev)
+          const next = switched ? loadEntries(sid) : new Map(prev)
           try {
             const msgs = props.api.state.session.messages(sid)
             if (msgs && (msgs as any[]).length) {
@@ -859,7 +958,7 @@ function SubAgentPanel(props: {
   const toggleExpand = (id: string) => {
     setExpanded((prev) => {
       const next = prev === id ? undefined : id
-      try { props.api.kv.set(expandedKey, next ?? "") } catch {}
+      try { persistExpanded(props.sessionId, next ?? "") } catch {}
       return next
     })
   }
@@ -983,7 +1082,7 @@ function SubAgentPanel(props: {
               const dir = e.button === 0 ? 1 : -1
               setScrollOffset((prev) => {
                 const next = Math.max(0, Math.min(prev + dir, total - m))
-                try { props.api.kv.set(scrollKey, next) } catch {}
+                try { persistScroll(props.sessionId, next) } catch {}
                 return next
               })
             }}
@@ -1213,6 +1312,7 @@ interface SharedSignals {
   setLang: (l: Lang) => void
   maxEntries: () => number
   setMaxEntries: (n: number) => void
+  sessionId: string
 }
 
 function createSidebarSlot(api: TuiPluginApi, sig: SharedSignals): TuiSlotPlugin {
@@ -1220,6 +1320,7 @@ function createSidebarSlot(api: TuiPluginApi, sig: SharedSignals): TuiSlotPlugin
     order: 60,
     slots: {
       sidebar_content(ctx: TuiSlotContext, input: { session_id: string }): JSX.Element {
+        sig.sessionId = input.session_id
         return (
           <SubAgentPanel
             theme={ctx.theme.current}
@@ -1246,7 +1347,7 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
     parseInt(String(api.kv.get(`${KV_PREFIX}.max_entries`, "10")), 10) || 10
   )
 
-  const signals: SharedSignals = { lang, setLang, maxEntries, setMaxEntries }
+  const signals: SharedSignals = { lang, setLang, maxEntries, setMaxEntries, sessionId: "" }
 
   api.slots.register(createSidebarSlot(api, signals))
 
@@ -1309,6 +1410,16 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
       slash: { name: "subagent-version" },
       onSelect: (dialog) => {
         api.ui.toast({ message: `opencode-subagent-monitor v${PLUGIN_VERSION}` })
+        dialog?.clear()
+      },
+    },
+    {
+      title: "Sub-Agent Monitor: Session",
+      value: "subagent-session",
+      description: "Show current session ID",
+      slash: { name: "subagent-session" },
+      onSelect: (dialog) => {
+        api.ui.toast({ message: `Session: ${signals.sessionId}` })
         dialog?.clear()
       },
     },
