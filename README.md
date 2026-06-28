@@ -18,6 +18,8 @@
 
 </div>
 
+对 Token 缓存可视化感兴趣吗？可以试试 [opencode-visual-cache](https://github.com/Hotakus/opencode-visual-cache) 这个插件！
+
 ---
 
 ## 1. 图片展示
