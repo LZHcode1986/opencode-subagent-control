@@ -18,6 +18,8 @@ If you find this plugin useful, consider giving it a star ⭐ — thank you!<br>
 
 </div>
 
+---
+
 Interested in token cache visualization? Check out [opencode-visual-cache](https://github.com/Hotakus/opencode-visual-cache)!
 
 ---
