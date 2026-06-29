@@ -1054,6 +1054,11 @@ function SubAgentPanel(props: {
   const hiddenAbove = createMemo(() => clampedOffset())
   const hiddenBelow = createMemo(() => Math.max(0, entryList().length - clampedOffset() - max()))
 
+  // Drop hover state when ↑ more disappears (hiddenAbove hits zero)
+  createEffect(() => {
+    if (hiddenAbove() === 0) setHoveredMoreAbove(false)
+  })
+
   // Reset scroll on sort order change: jump to newest in view
   let sortInitialized = false
   createEffect(() => {
