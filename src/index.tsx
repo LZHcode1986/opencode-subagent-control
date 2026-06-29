@@ -1068,7 +1068,9 @@ function SubAgentPanel(props: {
     const m = untrack(() => max())
     const target = props.sortOrder() === "desc" ? 0 : Math.max(0, total - m)
     setScrollOffset(target)
-    try { persistScroll(props.sessionId, target) } catch {}
+    setTimeout(() => {
+      try { persistScroll(props.sessionId, target) } catch {}
+    }, 0)
   })
 
   // When new entries arrive while viewing the newest end, keep the view at newest
@@ -1088,7 +1090,9 @@ function SubAgentPanel(props: {
     if (wasAtNewest) {
       const target = props.sortOrder() === "desc" ? 0 : Math.max(0, total - m)
       setScrollOffset(target)
-      try { persistScroll(props.sessionId, target) } catch {}
+      setTimeout(() => {
+        try { persistScroll(props.sessionId, target) } catch {}
+      }, 0)
     }
   })
 
