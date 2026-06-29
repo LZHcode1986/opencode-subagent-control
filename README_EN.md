@@ -49,10 +49,12 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 - **Manual Dismiss**: `- dismiss` button on the right side of expanded view to manually terminate stuck/zombie entries; `/subagent-clear-running` for batch cleanup
 - **Status Field**: `status: running/done/error` in expanded view, color-coded to match the status dot
 - **Collapsible Panel**: Click title bar to collapse/expand; state persists across restarts
-- **Scroll-to-Top**: `↑ Top` button at the bottom of the list for one-click return to top, with hover color change
+- **Scroll to Newest**: `↑ Top` / `↓ Bottom` button jumps to the newest entries; direction adapts to sort order
+- **Configurable Sort Order**: `/subagent-order` supports descending (newest first) and ascending (oldest first) ordering
+- **Scroll Mode Toggle**: `/subagent-scroll` switches between wheel scroll and click-to-scroll (click `↑ more` / `↓ more` to page), resolving sidebar/global scroll conflicts
 - **TTL Auto Cleanup**: Data older than 3 days is automatically purged from KV storage
 - **Language Support**: Runtime language switch via `/subagent-lang` (Chinese / English), preference persisted
-- **Slash Commands**: `/subagent-lang`, `/subagent-max`, `/subagent-session`, `/subagent-version`, `/subagent-clear-running` for dynamic configuration
+- **Slash Commands**: `/subagent-lang`, `/subagent-max`, `/subagent-order`, `/subagent-scroll`, `/subagent-session`, `/subagent-version`, `/subagent-clear-running` for dynamic configuration
 
 ---
 
@@ -103,6 +105,8 @@ The plugin supports dynamic configuration via slash commands or the command pale
 |---------|----------|-------|
 | `/subagent-lang` | Switch display language | Select Chinese or English from the list; takes effect instantly without restart |
 | `/subagent-max` | Adjust max visible entries | Enter a number (default 10) to control how many sub-agent entries are shown |
+| `/subagent-order` | Switch sort order | Choose descending (newest first) or ascending (oldest first); list re-sorts and jumps to newest |
+| `/subagent-scroll` | Switch scroll mode | Choose wheel scroll or click-to-scroll (click `↑ more` / `↓ more` to page) |
 | `/subagent-session` | View current session ID | Displays the current OpenCode session ID |
 | `/subagent-version` | View plugin version | Displays the current plugin version |
 | `/subagent-clear-running` | Batch cleanup stuck entries | Marks all running entries as done in one click, cleaning up stale data |
@@ -118,8 +122,8 @@ The plugin supports dynamic configuration via slash commands or the command pale
 |--------|-------------|
 | Click title bar | Collapse / Expand the panel |
 | Click entry row | Expand / Collapse details |
-| Scroll the list | Browse more sub-agents |
-| Click `↑ Top` | Jump to top of the list |
+| Scroll / Click `↑ more` `↓ more` | Page through entries (`/subagent-scroll` to toggle mode) |
+| Click `↑ Top` / `↓ Bottom` | Jump to the newest entries (direction adapts to sort order) |
 | Click `→ Open session` | Navigate to the sub-agent's session |
 | Click `- dismiss` | Manually terminate the entry (only shown for running entries) |
 
