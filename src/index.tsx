@@ -1239,19 +1239,27 @@ function SubAgentPanel(props: {
           >
             <Show when={hiddenAbove() > 0}>
               <text
-                style={{ fg: hoveredMoreAbove() ? pal().warning : pal().muted }}
                 onMouseOver={() => setHoveredMoreAbove(true)}
                 onMouseOut={() => setHoveredMoreAbove(false)}
                 onMouseUp={() => {
                   const total = entryList().length
                   const m = max()
                   if (total <= m) return
-                  setScrollOffset((prev) => Math.max(0, prev - m))
-                  try { persistScroll(props.sessionId, scrollOffset()) } catch {}
-                  setHoveredMoreAbove(false)
+                  const next = Math.max(0, scrollOffset() - m)
+                  if (next === 0) {
+                    setTimeout(() => {
+                      setScrollOffset(next)
+                      try { persistScroll(props.sessionId, next) } catch {}
+                    }, 0)
+                  } else {
+                    setScrollOffset(next)
+                    try { persistScroll(props.sessionId, next) } catch {}
+                  }
                 }}
               >
-                {"  "}&uarr; {hiddenAbove()} {t("scroll.more")}
+                <span style={{ fg: hoveredMoreAbove() ? pal().warning : pal().muted }}>
+                  {"  "}&uarr; {hiddenAbove()} {t("scroll.more")}
+                </span>
               </text>
             </Show>
             <For each={visibleList()}>
@@ -1453,7 +1461,6 @@ function SubAgentPanel(props: {
                 return (
                   <box flexDirection="row">
                     <text
-                      style={{ fg: showMore && hoveredMoreBelow() ? pal().warning : pal().muted }}
                       onMouseOver={() => showMore && setHoveredMoreBelow(true)}
                       onMouseOut={() => setHoveredMoreBelow(false)}
                       onMouseUp={() => {
@@ -1466,7 +1473,9 @@ function SubAgentPanel(props: {
                         setHoveredMoreBelow(false)
                       }}
                     >
-                      {left}
+                      <span style={{ fg: showMore && hoveredMoreBelow() ? pal().warning : pal().muted }}>
+                        {left}
+                      </span>
                     </text>
                     {showTop ? (
                       <>
