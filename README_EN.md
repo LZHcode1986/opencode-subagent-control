@@ -46,6 +46,7 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 - **Token & Cost Tracking**: Per-sub-agent token consumption and cost summary, displayed globally in the title bar
 - **Expandable Details**: Click to expand and view agent type, status, elapsed time, tokens, cost, model, and todo progress, with right-aligned values
 - **One-click Session Jump**: `→ Open session` link in expanded view to navigate to the sub-agent's full conversation
+- **Session ID Display**: Expanded detail shows the sub-agent session ID; click to view the full ID for copying
 - **Manual Dismiss**: `- dismiss` button on the right side of expanded view to manually terminate stuck/zombie entries; `/subagent-clear-running` for batch cleanup
 - **Status Field**: `status: running/done/error` in expanded view, color-coded to match the status dot
 - **Collapsible Panel**: Click title bar to collapse/expand; state persists across restarts
@@ -125,6 +126,7 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | Scroll / Click `↑ more` `↓ more` | Page through entries (`/subagent-scroll` to toggle mode) |
 | Click `↑ Top` / `↓ Bottom` | Jump to the newest entries (direction adapts to sort order) |
 | Click `→ Open session` | Navigate to the sub-agent's session |
+| Click `ses_xxx… ⎘` | Show full Session ID in toast for manual copy |
 | Click `- dismiss` | Manually terminate the entry (only shown for running entries) |
 
 ### 4.3 Status Colors
