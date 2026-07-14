@@ -309,6 +309,7 @@ function SubAgentPanel(props: {
     scroll: number
     expanded: string
     entries: SubEntry[]
+    cleared?: boolean
   }
 
   interface SessionRecord {
@@ -317,6 +318,7 @@ function SubAgentPanel(props: {
     scroll: number
     expanded: string
     children: Record<string, ChildRecord>
+    cleared?: boolean
   }
 
   const loadSessionData = (): Record<string, SessionRecord> => {
@@ -367,9 +369,9 @@ function SubAgentPanel(props: {
           if (!data[parentSid]) data[parentSid] = { ts: Date.now(), entries: [], scroll: 0, expanded: "", children: {} }
           if (!data[parentSid].children) data[parentSid].children = {}
           if (!data[parentSid].children[sid]) data[parentSid].children[sid] = { scroll: 0, expanded: "", entries: [] }
-          data[parentSid].children[sid] = { ...data[parentSid].children[sid], entries: [...entries.values()] }
+          data[parentSid].children[sid] = { ...data[parentSid].children[sid], entries: [...entries.values()], cleared: false }
         } else {
-          data[sid] = { ...data[sid], ts: Date.now(), entries: [...entries.values()], children: data[sid]?.children ?? {} }
+          data[sid] = { ...data[sid], ts: Date.now(), entries: [...entries.values()], children: data[sid]?.children ?? {}, cleared: false }
         }
         saveSessionData(data)
       } catch {}
@@ -454,9 +456,9 @@ function SubAgentPanel(props: {
             if (!data[parentSid]) data[parentSid] = { ts: Date.now(), entries: [], scroll: 0, expanded: "", children: {} }
             if (!data[parentSid].children) data[parentSid].children = {}
             if (!data[parentSid].children[props.sessionId]) data[parentSid].children[props.sessionId] = { scroll: 0, expanded: "", entries: [] }
-            data[parentSid].children[props.sessionId] = { ...data[parentSid].children[props.sessionId], entries: [...next.values()] }
+            data[parentSid].children[props.sessionId] = { ...data[parentSid].children[props.sessionId], entries: [...next.values()], cleared: false }
           } else {
-            data[props.sessionId] = { ...data[props.sessionId], ts: Date.now(), entries: [...next.values()], children: data[props.sessionId]?.children ?? {} }
+            data[props.sessionId] = { ...data[props.sessionId], ts: Date.now(), entries: [...next.values()], children: data[props.sessionId]?.children ?? {}, cleared: false }
           }
           saveSessionData(data)
         } catch {}
@@ -1001,6 +1003,11 @@ function SubAgentPanel(props: {
           const next = switched
             ? new Map(globalEntryCache.get(sid) ?? loadEntries(sid))
             : new Map(prev)
+          // 被手动清除的会话跳过消息扫描重建，仅保留事件驱动新增的条目
+          const { parentSid, isChild } = resolveParent(sid)
+          const parentRec = loadSessionData()[parentSid]
+          const activeRec = isChild ? parentRec?.children?.[sid] : parentRec
+          if (activeRec?.cleared) return next
           try {
             const msgs = props.api.state.session.messages(sid)
             if (msgs && (msgs as any[]).length) {
@@ -1957,6 +1964,7 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
                     data[parentID].children[sid].entries = []
                     data[parentID].children[sid].scroll = 0
                     data[parentID].children[sid].expanded = ""
+                    data[parentID].children[sid].cleared = true
                   }
                 } else {
                   count = data[sid]?.entries?.length ?? 0
@@ -1964,6 +1972,7 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
                     data[sid].entries = []
                     data[sid].scroll = 0
                     data[sid].expanded = ""
+                    data[sid].cleared = true
                   }
                 }
                 api.kv.set(`${KV_PREFIX}.session_data`, JSON.stringify(data))
