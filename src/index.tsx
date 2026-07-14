@@ -91,6 +91,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     "ttl.toast_unlimited": "清理周期已设为无期限",
     "clear.title": "确认清除",
     "clear.prompt": "确定清除当前会话所有子代理记录？此操作不可撤销。",
+    "clear.prompt_running": "当前有 {n} 个运行中的子代理，清除后将不可恢复。确定继续？",
     "clear.done": "已清除 {n} 条子代理记录",
     "clear.empty": "当前会话无子代理记录",
   },
@@ -129,6 +130,7 @@ const I18N: Record<Lang, Record<string, string>> = {
     "ttl.toast_unlimited": "TTL set to Never",
     "clear.title": "Confirm",
     "clear.prompt": "Clear all sub-agent records for this session? This cannot be undone.",
+    "clear.prompt_running": "{n} sub-agent(s) are still running. Clearing will discard them permanently. Continue?",
     "clear.done": "Cleared {n} sub-agent record(s)",
     "clear.empty": "No sub-agent records in this session",
   },
@@ -1965,10 +1967,19 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
         const sid = signals.sessionId
         const sessionObj = api.state.session.get(sid)
         const parentID = (sessionObj as any)?.parentID as string | undefined
+        // 检查是否存在运行中的条目
+        const cached = globalEntryCache.get(sid)
+        let runningCount = 0
+        if (cached) {
+          for (const [, e] of cached) { if (e.status === "running") runningCount++ }
+        }
+        const msg = runningCount > 0
+          ? t("clear.prompt_running").replace("{n}", String(runningCount))
+          : t("clear.prompt")
         dialog?.replace(() => (
           <api.ui.DialogConfirm
             title={t("clear.title")}
-            message={t("clear.prompt")}
+            message={msg}
             onConfirm={() => {
               try {
                 const data = JSON.parse(String(api.kv.get(`${KV_PREFIX}.session_data`, "{}")))
