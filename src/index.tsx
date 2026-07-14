@@ -86,7 +86,9 @@ const I18N: Record<Lang, Record<string, string>> = {
     "ttl.7d": "7 天",
     "ttl.14d": "14 天",
     "ttl.30d": "30 天",
+    "ttl.unlimited": "无期限",
     "ttl.toast": "清理周期已设为 {n} 天",
+    "ttl.toast_unlimited": "清理周期已设为无期限",
     "clear.title": "确认清除",
     "clear.prompt": "确定清除当前会话所有子代理记录？此操作不可撤销。",
     "clear.done": "已清除 {n} 条子代理记录",
@@ -122,7 +124,9 @@ const I18N: Record<Lang, Record<string, string>> = {
     "ttl.7d": "7 days",
     "ttl.14d": "14 days",
     "ttl.30d": "30 days",
+    "ttl.unlimited": "Never",
     "ttl.toast": "TTL set to {n} days",
+    "ttl.toast_unlimited": "TTL set to Never",
     "clear.title": "Confirm",
     "clear.prompt": "Clear all sub-agent records for this session? This cannot be undone.",
     "clear.done": "Cleared {n} sub-agent record(s)",
@@ -302,7 +306,8 @@ function SubAgentPanel(props: {
 
   // ── session data (single-key, true deletion on cleanup) ──
   const SESSION_DATA_KEY = `${KV_PREFIX}.session_data`
-  const ttlDays = parseInt(String(props.api.kv.get(`${KV_PREFIX}.ttl_days`, "3")), 10) || 3
+  const ttlDaysRaw = parseInt(String(props.api.kv.get(`${KV_PREFIX}.ttl_days`, "3")), 10)
+  const ttlDays = Number.isNaN(ttlDaysRaw) ? 3 : ttlDaysRaw
   const TTL_MS = ttlDays * 24 * 60 * 60 * 1000
 
   interface ChildRecord {
@@ -411,6 +416,7 @@ function SubAgentPanel(props: {
   }
 
   const cleanupOldSessions = () => {
+    if (ttlDays <= 0) return  // 无期限，跳过清理
     try {
       const data = loadSessionData()
       const cutoff = Date.now() - TTL_MS
@@ -1930,11 +1936,12 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
               { title: t("ttl.7d"), value: "7" },
               { title: t("ttl.14d"), value: "14" },
               { title: t("ttl.30d"), value: "30" },
+              { title: t("ttl.unlimited"), value: "0" },
             ]}
             onSelect={(opt) => {
               const days = parseInt(opt.value, 10)
               api.kv.set(`${KV_PREFIX}.ttl_days`, String(days))
-              const msg = t("ttl.toast").replace("{n}", String(days))
+              const msg = days === 0 ? t("ttl.toast_unlimited") : t("ttl.toast").replace("{n}", String(days))
               api.ui.toast({ message: msg })
               dialog?.clear()
             }}
