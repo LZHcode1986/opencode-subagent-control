@@ -286,6 +286,9 @@ function safeErrorMsg(err: unknown): string {
 // 模块级缓存：各 session 的 entry 状态独立存储，不随当前视图切换而清除。
 const globalEntryCache = new Map<string, Map<string, SubEntry>>()
 
+// 模块级刷新信号：外部（如斜杠命令）触发清除后 +1，组件 scan 依赖它以重扫。
+const [clearTick, setClearTick] = createSignal(0)
+
 function SubAgentPanel(props: {
   theme: TuiThemeCurrent
   api: TuiPluginApi
@@ -977,6 +980,7 @@ function SubAgentPanel(props: {
     lastSid = sid
     const t = setTimeout(() => {
       untrack(() => {
+        void clearTick() // 外部触发的清除事件 → 重扫
         if (switched) {
           const { parentSid, isChild } = resolveParent(sid)
           const data = loadSessionData()
@@ -1963,6 +1967,8 @@ const tui: TuiPlugin = async (api: TuiPluginApi) => {
                   }
                 }
                 api.kv.set(`${KV_PREFIX}.session_data`, JSON.stringify(data))
+                globalEntryCache.delete(sid)
+                setClearTick((v) => v + 1)
                 const msg = t("clear.done").replace("{n}", String(count))
                 api.ui.toast({ message: msg })
               } catch {}
