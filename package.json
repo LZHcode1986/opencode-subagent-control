@@ -10,7 +10,7 @@
       "types": "./dist/server.d.ts"
     },
     "./tui": {
-      "import": "./src/index.tsx",
+      "import": "./dist/tui.js",
       "config": {
         "enabled": true
       }
