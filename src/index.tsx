@@ -692,9 +692,12 @@ function SubAgentPanel(props: {
     try {
       const st = props.api.state.session.status(childId)
       if (st?.type !== "busy") {
-        props.api.ui.toast({
-          title: entry.title || entry.agent,
-          message: t("cancel.label") + ": " + (I18N[props.lang()]["cancel.already_ended"] ?? "Session already ended, no need to cancel"),
+        const tokens = readSessionTokens(childId)
+        const cost = readSessionCost(childId)
+        upsertEntry({
+          id: entry.id, title: entry.title, agent: entry.agent, prompt: entry.prompt,
+          status: "completed", sessionId: entry.sessionId,
+          tokens, cost,
         })
         return
       }
@@ -709,7 +712,7 @@ function SubAgentPanel(props: {
     upsertEntry({
       id: entry.id, title: entry.title, agent: entry.agent, prompt: entry.prompt,
       status: "cancel_requested", sessionId: entry.sessionId,
-      cancelRequestedAt: Date.now(), abortAccepted: false,
+      cancelRequestedAt: Date.now(), abortAccepted: false, cancelReason: "manual",
     } as any)
 
     try {
