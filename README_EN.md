@@ -47,7 +47,8 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 - **Expandable Details**: Click to expand and view agent type, status, elapsed time, tokens, cost, model, and todo progress, with right-aligned values
 - **One-click Session Jump**: `→ Open session` link in expanded view to navigate to the sub-agent's full conversation
 - **Session ID Display**: Expanded detail shows the sub-agent session ID; click to view the full ID for copying
-- **Manual Dismiss**: `- dismiss` button on the right side of expanded view to manually terminate stuck/zombie entries; `/subagent-clear-running` for batch cleanup
+- **Manual Dismiss**: `- Dismiss display` button on the right side of expanded view to manually clear stuck/zombie entries (local UI only, does NOT cancel the real task); `/subagent-clear-running` for batch cleanup
+- **Real Cancel**: Running entries with a session ID show a red `Cancel task` button that calls OpenCode's real cancel API, unblocks the parent task, and shows `cancelled` status
 - **Status Field**: `status: running/done/error` in expanded view, color-coded to match the status dot
 - **Collapsible Panel**: Click title bar to collapse/expand; state persists across restarts
 - **Scroll to Newest**: `↑ Top` / `↓ Bottom` button jumps to the newest entries; direction adapts to sort order
@@ -136,7 +137,8 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | Click `↑ Top` / `↓ Bottom` | Jump to the newest entries (direction adapts to sort order) |
 | Click `→ Open session` | Navigate to the sub-agent's session |
 | Click `ses_xxx… ⎘` | Show full Session ID in toast for manual copy |
-| Click `- dismiss` | Manually terminate the entry (only shown for running entries) |
+| Click `- Dismiss display` | Clear the entry from the plugin display only, does NOT cancel the real task (only shown for running entries) |
+| Click `Cancel task` (red) | Really cancel the sub-agent via session.abort, unblocks parent task (requires a session ID) |
 
 ### 4.3 Status Colors
 
@@ -145,6 +147,7 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | 🟢 Green | Done |
 | 🟡 Yellow (breathing) | Running |
 | 🔴 Red | Error |
+| ⚪ Gray | Cancelled |
 | ⚪ Gray | Cancelled |
 
 ---
