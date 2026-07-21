@@ -50,7 +50,7 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 - **Token & Cost Tracking**: Per-sub-agent token consumption and cost summary, displayed globally in the title bar
 - **Expandable Details**: Click to expand and view agent type, status, elapsed time, tokens, cost, model, and todo progress, with right-aligned values
 - **One-click Session Jump**: `→ Open session` link in expanded view to navigate to the sub-agent's full conversation
-- **Session ID Display**: Expanded detail shows the sub-agent session ID; click to view the full ID for copying
+- **One-click Session ID Copy**: Expanded detail shows the sub-agent session ID; click `ses_xxx… ⎘` to copy directly to the system clipboard (Windows/macOS/Linux)
 - **Manual Dismiss**: `- Dismiss display` button on the right side of expanded view to manually clear stuck/zombie entries (local UI only, does NOT cancel the real task); `/subagent-clear-running` for batch cleanup
 - **Real Cancel**: Running entries with a session ID show a red `Cancel task` button that calls OpenCode's real cancel API, unblocks the parent task, and shows `cancelled` status
 - **Status Field**: `status: running/done/error` in expanded view, color-coded to match the status dot
@@ -140,7 +140,7 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | Scroll / Click `↑ more` `↓ more` | Page through entries (`/subagent-scroll` to toggle mode) |
 | Click `↑ Top` / `↓ Bottom` | Jump to the newest entries (direction adapts to sort order) |
 | Click `→ Open session` | Navigate to the sub-agent's session |
-| Click `ses_xxx… ⎘` | Show full Session ID in toast for manual copy |
+| Click `ses_xxx… ⎘` | One-click copy Session ID to system clipboard (Windows/macOS/Linux/SSH) |
 | Click `- Dismiss display` | Clear the entry from the plugin display only, does NOT cancel the real task (only shown for running entries) |
 | Click `Cancel task` (red) | Really cancel the sub-agent via session.abort, unblocks parent task (requires a session ID) |
 
@@ -151,7 +151,6 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | 🟢 Green | Done |
 | 🟡 Yellow (breathing) | Running |
 | 🔴 Red | Error |
-| ⚪ Gray | Cancelled |
 | ⚪ Gray | Cancelled |
 
 ---

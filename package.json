@@ -1,6 +1,6 @@
 {
   "name": "opencode-subagent-control",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sub-agent runtime monitor & cancellation control for OpenCode TUI",
   "type": "module",
   "types": "dist/index.d.ts",
@@ -55,6 +55,7 @@
   "devDependencies": {
     "@opencode-ai/plugin": "^1.14.50",
     "@opencode-ai/sdk": "^1.14.50",
+    "@types/node": "^26.1.1",
     "esbuild": "^0.25.0",
     "esbuild-plugin-solid": "^0.5.0",
     "tsx": "^4.22.3",
