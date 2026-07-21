@@ -10,11 +10,11 @@
 If you find this plugin useful, consider giving it a star ⭐ — thank you!<br>
 <br>
 
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/Hotakus/opencode-subagent-magazine)
-[![Stars](https://img.shields.io/github/stars/Hotakus/opencode-subagent-magazine?style=flat-square)](https://github.com/Hotakus/opencode-subagent-magazine/stargazers)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/LZHcode1986/opencode-subagent-control)
+[![Stars](https://img.shields.io/github/stars/LZHcode1986/opencode-subagent-control?style=flat-square)](https://github.com/LZHcode1986/opencode-subagent-control/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![中文](https://img.shields.io/badge/中文-README-blue?style=flat-square)](https://github.com/Hotakus/opencode-subagent-magazine/blob/master/README.md)
-![NPM Version](https://img.shields.io/npm/v/opencode-subagent-magazine?style=flat-square)
+[![中文](https://img.shields.io/badge/中文-README-blue?style=flat-square)](https://github.com/LZHcode1986/opencode-subagent-control/blob/master/README.md)
+![NPM Version](https://img.shields.io/npm/v/opencode-subagent-control?style=flat-square)
 
 </div>
 
@@ -28,13 +28,13 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 
 <div align="center"> 
 <strong>Collapsed · Quick Overview 👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse.png"></img>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse_en.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/collapse.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/collapse_en.png"></img>
 </div>
 <div align="center"> 
 <strong>Expanded · Detailed Info 👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand.png"></img>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand_en.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/expand.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/expand_en.png"></img>
 </div>
 
 
@@ -68,7 +68,7 @@ Interested in token cache visualization? Check out [opencode-visual-cache](https
 Press **`Ctrl + P`** in OpenCode to open the command palette, search for **`install plugin`**, and enter:
 
 ```
-opencode-subagent-magazine@latest
+opencode-subagent-control@latest
 ```
 
 Press Enter to complete installation and configuration.
@@ -78,21 +78,21 @@ Press Enter to complete installation and configuration.
 **1. Install the plugin**
 
 ```bash
-npm install -g opencode-subagent-magazine@latest
+npm install -g opencode-subagent-control@latest
 ```
 
 **2. Configure the TUI plugin**
 
 ```bash
 # Option A: OpenCode CLI install (recommended; writes to local .opencode/)
-opencode plugin opencode-subagent-magazine@latest
+opencode plugin opencode-subagent-control@latest
 ```
 
 ```jsonc
 # Option B: Manually create or edit ~/.config/opencode/tui.jsonc (global config)
 {
   "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-subagent-magazine@latest"]
+  "plugin": ["opencode-subagent-control@latest"]
 }
 ```
 
@@ -123,8 +123,8 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | `/subagent-clear-running` | Batch cleanup stuck entries | Marks all running entries as done in one click, cleaning up stale data |
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/slash_cmds.png" alt="Slash Commands" width="49%"></img>
-  <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/ctrlP_cmds.png" alt="Ctrl+P Command Palette" width="49%"></img>
+  <img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/slash_cmds.png" alt="Slash Commands" width="49%"></img>
+  <img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/ctrlP_cmds.png" alt="Ctrl+P Command Palette" width="49%"></img>
 </div>
 
 ### 4.2 Keyboard & Mouse
@@ -162,17 +162,17 @@ Update steps:
 
 ```powershell
 # Windows
-Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\opencode-subagent-magazine@latest"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\opencode-subagent-control@latest"
 ```
 
 ```bash
 # macOS / Linux
-rm -rf ~/.cache/opencode/packages/opencode-subagent-magazine@latest
+rm -rf ~/.cache/opencode/packages/opencode-subagent-control@latest
 ```
 
 **2. Reinstall the plugin**
 
-In OpenCode, press **`Ctrl + P`** → `install plugin` → `opencode-subagent-magazine@latest` → Enter
+In OpenCode, press **`Ctrl + P`** → `install plugin` → `opencode-subagent-control@latest` → Enter
 
 **3. Restart OpenCode**
 

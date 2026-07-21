@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Install script for opencode-subagent-magazine.
+ * Install script for opencode-subagent-control.
  *
  * Creates or updates `~/.config/opencode/tui.jsonc` so OpenCode loads
  * the TUI sidebar plugin.
  *
  * Usage:
  *   node install.mjs
- *   npm explore opencode-subagent-magazine -- node install.mjs
+ *   npm explore opencode-subagent-control -- node install.mjs
  */
 
 import { readFile, writeFile, mkdir, access } from "node:fs/promises"
@@ -16,7 +16,7 @@ import { constants } from "node:fs"
 import { homedir, platform } from "node:os"
 import { join, dirname } from "node:path"
 
-const PLUGIN_SPEC = "opencode-subagent-magazine"
+const PLUGIN_SPEC = "opencode-subagent-control"
 
 function configDir() {
   if (platform() === "win32") {
@@ -62,9 +62,9 @@ async function main() {
     tuiChanged = mergePlugin(cfg, PLUGIN_SPEC)
     if (tuiChanged) {
       await writeFile(tuiPath, formatJSONC(cfg))
-      console.log(`[opencode-subagent-magazine] Added to ${tuiPath}`)
+      console.log(`[opencode-subagent-control] Added to ${tuiPath}`)
     } else {
-      console.log(`[opencode-subagent-magazine] Already in ${tuiPath}`)
+      console.log(`[opencode-subagent-control] Already in ${tuiPath}`)
     }
   } else {
     const cfg = {
@@ -72,7 +72,7 @@ async function main() {
       plugin: [PLUGIN_SPEC],
     }
     await writeFile(tuiPath, formatJSONC(cfg))
-    console.log(`[opencode-subagent-magazine] Created ${tuiPath}`)
+    console.log(`[opencode-subagent-control] Created ${tuiPath}`)
     tuiChanged = true
   }
 
@@ -85,7 +85,7 @@ async function main() {
     ocChanged = mergePlugin(cfg, PLUGIN_SPEC)
     if (ocChanged) {
       await writeFile(ocPath, formatJSONC(cfg))
-      console.log(`[opencode-subagent-magazine] Also added to ${ocPath}`)
+      console.log(`[opencode-subagent-control] Also added to ${ocPath}`)
     }
   }
 

@@ -10,11 +10,11 @@
 如果你觉得这个插件不错的话，可以帮我点点小星星 ⭐，谢谢！<br>
 <br>
 
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/Hotakus/opencode-subagent-magazine)
-[![Stars](https://img.shields.io/github/stars/Hotakus/opencode-subagent-magazine?style=flat-square)](https://github.com/Hotakus/opencode-subagent-magazine/stargazers)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?style=flat-square&logo=github)](https://github.com/LZHcode1986/opencode-subagent-control)
+[![Stars](https://img.shields.io/github/stars/LZHcode1986/opencode-subagent-control?style=flat-square)](https://github.com/LZHcode1986/opencode-subagent-control/stargazers)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![English](https://img.shields.io/badge/English-README-blue?style=flat-square)](https://github.com/Hotakus/opencode-subagent-magazine/blob/master/README_EN.md)
-![NPM Version](https://img.shields.io/npm/v/opencode-subagent-magazine?style=flat-square)
+[![English](https://img.shields.io/badge/English-README-blue?style=flat-square)](https://github.com/LZHcode1986/opencode-subagent-control/blob/master/README_EN.md)
+![NPM Version](https://img.shields.io/npm/v/opencode-subagent-control?style=flat-square)
 
 </div>
 
@@ -28,13 +28,13 @@
 
 <div align="center"> 
 <strong>折叠态 · 简洁概览👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse.png"></img>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/collapse_en.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/collapse.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/collapse_en.png"></img>
 </div>
 <div align="center"> 
 <strong>展开态 · 详细信息👇</strong> <br>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand.png"></img>
-<img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/expand_en.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/expand.png"></img>
+<img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/expand_en.png"></img>
 </div>
 
 
@@ -68,7 +68,7 @@
 在 OpenCode 中按 **`Ctrl + P`** 打开命令面板，搜索 **`install plugin`**，输入：
 
 ```
-opencode-subagent-magazine@latest
+opencode-subagent-control@latest
 ```
 
 回车即可完成安装与配置。
@@ -78,21 +78,21 @@ opencode-subagent-magazine@latest
 **1. 安装插件**
 
 ```bash
-npm install -g opencode-subagent-magazine@latest
+npm install -g opencode-subagent-control@latest
 ```
 
 **2. 配置 TUI 插件**
 
 ```bash
 # 方式 A：OpenCode 命令安装（推荐，自动写入项目本地 .opencode/）
-opencode plugin opencode-subagent-magazine@latest
+opencode plugin opencode-subagent-control@latest
 ```
 
 ```jsonc
 # 方式 B：手动创建或编辑 ~/.config/opencode/tui.jsonc（全局配置）
 {
   "$schema": "https://opencode.ai/tui.json",
-  "plugin": ["opencode-subagent-magazine@latest"]
+  "plugin": ["opencode-subagent-control@latest"]
 }
 ```
 
@@ -123,8 +123,8 @@ opencode plugin opencode-subagent-magazine@latest
 | `/subagent-clear-running` | 批量清理僵尸条目 | 一键将所有运行中的条目标记为完成，清理卡住的旧数据 |
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/slash_cmds.png" alt="斜杠命令" width="49%"></img>
-  <img src="https://raw.githubusercontent.com/Hotakus/opencode-subagent-magazine/master/assets/ctrlP_cmds.png" alt="Ctrl+P 命令面板" width="49%"></img>
+  <img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/slash_cmds.png" alt="斜杠命令" width="49%"></img>
+  <img src="https://raw.githubusercontent.com/LZHcode1986/opencode-subagent-control/master/assets/ctrlP_cmds.png" alt="Ctrl+P 命令面板" width="49%"></img>
 </div>
 
 ### 4.2 键盘 & 鼠标
@@ -162,17 +162,17 @@ opencode plugin opencode-subagent-magazine@latest
 
 ```powershell
 # Windows
-Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\opencode-subagent-magazine@latest"
+Remove-Item -Recurse -Force "$env:USERPROFILE\.cache\opencode\packages\opencode-subagent-control@latest"
 ```
 
 ```bash
 # macOS / Linux
-rm -rf ~/.cache/opencode/packages/opencode-subagent-magazine@latest
+rm -rf ~/.cache/opencode/packages/opencode-subagent-control@latest
 ```
 
 **2. 重新安装插件**
 
-在 OpenCode 中按 **`Ctrl + P`** → `install plugin` → `opencode-subagent-magazine@latest` → 回车
+在 OpenCode 中按 **`Ctrl + P`** → `install plugin` → `opencode-subagent-control@latest` → 回车
 
 **3. 重启 OpenCode**
 

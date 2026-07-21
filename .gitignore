@@ -1,6 +1,4 @@
 node_modules/
 dist/
-*.tsbuildinfo
-.sisyphus/
-migrate-kv.mjs
+*.tgz
 src/_version.ts
