@@ -20,6 +20,10 @@
 
 ---
 
+> 本项目基于 [Hotakus/opencode-subagent-magazine](https://github.com/Hotakus/opencode-subagent-magazine) 扩展，在原版基础上增加了真实取消子代理的能力。
+
+---
+
 对 Token 缓存可视化感兴趣吗？可以试试 [opencode-visual-cache](https://github.com/Hotakus/opencode-visual-cache) 这个插件！
 
 ---

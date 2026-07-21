@@ -20,6 +20,10 @@ If you find this plugin useful, consider giving it a star ⭐ — thank you!<br>
 
 ---
 
+> This project extends [Hotakus/opencode-subagent-magazine](https://github.com/Hotakus/opencode-subagent-magazine) with real sub-agent cancellation support.
+
+---
+
 Interested in token cache visualization? Check out [opencode-visual-cache](https://github.com/Hotakus/opencode-visual-cache)!
 
 ---
