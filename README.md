@@ -82,14 +82,20 @@ npm install -g opencode-subagent-magazine@latest
 
 **2. 配置 TUI 插件**
 
-创建或编辑 `~/.config/opencode/tui.jsonc`：
+```bash
+# 方式 A：OpenCode 命令安装（推荐，自动写入项目本地 .opencode/）
+opencode plugin opencode-subagent-magazine@latest
+```
 
 ```jsonc
+# 方式 B：手动创建或编辑 ~/.config/opencode/tui.jsonc（全局配置）
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": ["opencode-subagent-magazine@latest"]
 }
 ```
+
+> **注意**：`opencode plugin install` 命令会将配置写入项目目录下的 `.opencode/tui.json`（本地作用域），优先级高于全局 `~/.config/opencode/tui.jsonc`。
 
 ### 3.3 重启 OpenCode
 
@@ -139,6 +145,7 @@ npm install -g opencode-subagent-magazine@latest
 | 🟢 绿色 | 已完成 |
 | 🟡 黄色（呼吸动画） | 运行中 |
 | 🔴 红色 | 错误 |
+| ⚪ 灰色 | 已取消 |
 
 ---
 

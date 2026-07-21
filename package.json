@@ -10,7 +10,7 @@
       "types": "./dist/server.d.ts"
     },
     "./tui": {
-      "import": "./dist/tui.js",
+      "import": "./src/index.tsx",
       "config": {
         "enabled": true
       }
@@ -20,7 +20,8 @@
     "dist",
     "src",
     "install.mjs",
-    "README.md"
+    "README.md",
+    "README_EN.md"
   ],
   "bin": {
     "opencode-subagent-magazine": "install.mjs"

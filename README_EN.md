@@ -82,14 +82,20 @@ npm install -g opencode-subagent-magazine@latest
 
 **2. Configure the TUI plugin**
 
-Create or edit `~/.config/opencode/tui.jsonc`:
+```bash
+# Option A: OpenCode CLI install (recommended; writes to local .opencode/)
+opencode plugin opencode-subagent-magazine@latest
+```
 
 ```jsonc
+# Option B: Manually create or edit ~/.config/opencode/tui.jsonc (global config)
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": ["opencode-subagent-magazine@latest"]
 }
 ```
+
+> **Note**: The `opencode plugin install` command writes to `.opencode/tui.json` in the project directory (local scope), which takes precedence over the global `~/.config/opencode/tui.jsonc`.
 
 ### 3.3 Restart OpenCode
 
@@ -139,6 +145,7 @@ The plugin supports dynamic configuration via slash commands or the command pale
 | 🟢 Green | Done |
 | 🟡 Yellow (breathing) | Running |
 | 🔴 Red | Error |
+| ⚪ Gray | Cancelled |
 
 ---
 
