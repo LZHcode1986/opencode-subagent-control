@@ -84,8 +84,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     "status.completed": "已完成",
     "status.cancelled": "已取消",
     "status.error": "错误",
-    "order.desc": "降序（最新在前）",
-    "order.asc": "升序（最早在前）",
+    "order.desc": "运行优先（组内最新在前）",
+    "order.asc": "运行优先（组内最早在前）",
     "scroll.wheel": "滚轮翻页",
     "scroll.click": "点击翻页",
     "ttl.label": "清理周期",
@@ -134,8 +134,8 @@ const I18N: Record<Lang, Record<string, string>> = {
     "status.completed": "completed",
     "status.cancelled": "cancelled",
     "status.error": "error",
-    "order.desc": "Desc (newest first)",
-    "order.asc": "Asc (oldest first)",
+    "order.desc": "Running first (newest in group)",
+    "order.asc": "Running first (oldest in group)",
     "scroll.wheel": "Wheel Scroll",
     "scroll.click": "Click Scroll",
     "ttl.label": "TTL (Time to Live)",
@@ -1402,14 +1402,31 @@ function SubAgentPanel(props: {
     }
   })
 
+  const isActiveEntry = (entry: SubEntry) =>
+    entry.status === "running" ||
+    entry.status === "cancel_requested"
+
   // ── derived signals ──
   // Stable list — only changes when entryMap changes
   const entryList = createMemo(() => {
     const entries = [...entryMap().values()]
-    if (props.sortOrder() === "desc") {
-      return entries.sort((a, b) => b.startedAt - a.startedAt)
-    }
-    return entries.sort((a, b) => a.startedAt - b.startedAt)
+    const descending = props.sortOrder() === "desc"
+
+    return entries.sort((a, b) => {
+      // Level 1: active entries on top
+      const activeOrder =
+        Number(isActiveEntry(b)) - Number(isActiveEntry(a))
+
+      if (activeOrder !== 0) return activeOrder
+
+      // Level 2: within group, sort by startedAt
+      const timeOrder = descending
+        ? b.startedAt - a.startedAt
+        : a.startedAt - b.startedAt
+
+      // Stable ordering for same startedAt
+      return timeOrder || a.id.localeCompare(b.id)
+    })
   })
 
   const max = props.maxEntries
