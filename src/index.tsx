@@ -889,14 +889,14 @@ function SubAgentPanel(props: {
           if (!eaNorm || !saNorm) continue
           if (!eaNorm.includes(saNorm) && !saNorm.includes(eaNorm)) continue
           const gap = nowTs - (entry.startedAt || 0)
-          if (!best || gap > best.gap) best = { entry, gap }
+          if (!best || gap < best.gap) best = { entry, gap }
         }
         if (!best) {
           for (const [, entry] of entriesMap) {
             if (entry.status !== "running") continue
             if (entry.sessionId) continue
             const gap = nowTs - (entry.startedAt || 0)
-            if (!best || gap > best.gap) best = { entry, gap }
+            if (!best || gap < best.gap) best = { entry, gap }
           }
         }
         if (best) {
@@ -952,7 +952,7 @@ function SubAgentPanel(props: {
           if (!eaNorm || !saNorm) continue
           if (!eaNorm.includes(saNorm) && !saNorm.includes(eaNorm)) continue
           const gap = nowTs - (entry.startedAt || 0)
-          if (!best || gap > best.gap) best = { id, gap }
+          if (!best || gap < best.gap) best = { id, gap }
         }
 
         // Phase 2: if agent name has no overlap (e.g. category calls: agent="deep" vs sessionAgent="Sisyphus-Junior"),
@@ -962,7 +962,7 @@ function SubAgentPanel(props: {
             if (entry.status !== "running") continue
             if (entry.sessionId) continue
             const gap = nowTs - (entry.startedAt || 0)
-            if (!best || gap > best.gap) best = { id, gap }
+            if (!best || gap < best.gap) best = { id, gap }
           }
         }
 
@@ -1066,13 +1066,12 @@ function SubAgentPanel(props: {
           const next = new Map(prev)
           for (const [id, entry] of next) {
             if (entry.status === "running" && entry.sessionId) {
-              // Only read from child sessions, never the parent
-              let isChild = false
+              // Only read from child sessions (including grandchildren), never the parent
+              let isDescendant = false
               try {
-                const s = props.api.state.session.get(entry.sessionId)
-                isChild = s?.parentID === props.sessionId
+                isDescendant = isDescendantOf(entry.sessionId, props.sessionId)
               } catch {}
-              if (!isChild) continue
+              if (!isDescendant) continue
               const total = readSessionTokens(entry.sessionId)
               const todo = readSessionTodo(entry.sessionId)
               const model = entry.model ?? readSessionModel(entry.sessionId)
@@ -1522,7 +1521,7 @@ function SubAgentPanel(props: {
               const total = entryList().length
               const m = max()
               if (total <= m) return
-              const dir = e.button === 0 ? 1 : -1
+              const dir = e.scroll?.direction === "up" ? 1 : -1
               setScrollOffset((prev) => {
                 const next = Math.max(0, Math.min(prev + dir, total - m))
                 try { persistScroll(props.sessionId, next) } catch {}
