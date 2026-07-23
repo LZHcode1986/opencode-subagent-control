@@ -812,6 +812,9 @@ function SubAgentPanel(props: {
     const part = props_?.part as Record<string, unknown> | undefined
     if (!part) return
 
+    const ownerSid = part.sessionID ? String(part.sessionID) : undefined
+    const rootSid = ownerSid ? resolveRootSession(ownerSid) : props.sessionId
+
     // SubtaskPart
     if (part.type === "subtask") {
       const agent = String(part.agent ?? "?")
@@ -823,7 +826,14 @@ function SubAgentPanel(props: {
       const subSid = part.sessionID !== undefined ? String(part.sessionID) : undefined
       const partModel = part.model as { modelID?: string } | undefined
       const modelId = partModel?.modelID ? String(partModel.modelID) : undefined
-      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
+      upsertEntryForSession(rootSid, { id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
+
+      const visibleInCurrentView = ownerSid && (
+        ownerSid === props.sessionId || isDescendantOf(ownerSid, props.sessionId)
+      )
+      if (visibleInCurrentView && rootSid !== props.sessionId) {
+        upsertEntry({ id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
+      }
     }
 
     // ToolPart
@@ -845,7 +855,14 @@ function SubAgentPanel(props: {
         if (!part.id) return
         const existing = entryMap().get(id)
         if (existing) {
-          upsertEntry({ id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
+          upsertEntryForSession(rootSid, { id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
+
+          const visibleInCurrentView = ownerSid && (
+            ownerSid === props.sessionId || isDescendantOf(ownerSid, props.sessionId)
+          )
+          if (visibleInCurrentView && rootSid !== props.sessionId) {
+            upsertEntry({ id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
+          }
         }
         return
       }
@@ -872,7 +889,15 @@ function SubAgentPanel(props: {
       const subSid = stMeta?.session_id !== undefined ? String(stMeta.session_id)
         : stMeta?.sessionId !== undefined ? String(stMeta.sessionId)
         : undefined
-      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status })
+      const time = st?.time as { start?: number; end?: number } | undefined
+      upsertEntryForSession(rootSid, { id, title, agent, prompt, sessionId: subSid, status, startedAt: time?.start, endedAt: time?.end })
+
+      const visibleInCurrentView = ownerSid && (
+        ownerSid === props.sessionId || isDescendantOf(ownerSid, props.sessionId)
+      )
+      if (visibleInCurrentView && rootSid !== props.sessionId) {
+        upsertEntry({ id, title, agent, prompt, sessionId: subSid, status, startedAt: time?.start })
+      }
     }
   }
 
