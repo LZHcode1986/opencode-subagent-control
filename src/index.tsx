@@ -414,6 +414,22 @@ function SubAgentPanel(props: {
     }, 200)
   }
 
+  const persistEntriesForSession = (targetSid: string, entries: Map<string, SubEntry>) => {
+    try {
+      const data = loadSessionData()
+      const { parentSid, isChild } = resolveParent(targetSid)
+      if (isChild) {
+        if (!data[parentSid]) data[parentSid] = { ts: Date.now(), entries: [], scroll: 0, expanded: "", children: {} }
+        if (!data[parentSid].children) data[parentSid].children = {}
+        if (!data[parentSid].children[targetSid]) data[parentSid].children[targetSid] = { scroll: 0, expanded: "", entries: [] }
+        data[parentSid].children[targetSid] = { ...data[parentSid].children[targetSid], entries: [...entries.values()] }
+      } else {
+        data[targetSid] = { ...data[targetSid], ts: Date.now(), entries: [...entries.values()], children: data[targetSid]?.children ?? {} }
+      }
+      saveSessionData(data)
+    } catch {}
+  }
+
   const persistScroll = (sid: string, scroll: number) => {
     try {
       const data = loadSessionData()
@@ -642,6 +658,28 @@ function SubAgentPanel(props: {
     })
   }
 
+  const upsertEntryForSession = (
+    targetSid: string,
+    partial: Omit<SubEntry, "startedAt" | "endedAt"> & { startedAt?: number; endedAt?: number },
+  ) => {
+    if (targetSid === props.sessionId) {
+      upsertEntry(partial)
+      return
+    }
+    const next = new Map(globalEntryCache.get(targetSid) ?? loadEntries(targetSid))
+    const existing = next.get(partial.id)
+    const now = Date.now()
+    const settled = ["completed", "cancelled", "error"].includes(partial.status)
+    next.set(partial.id, {
+      ...(existing ?? {}),
+      ...partial,
+      startedAt: existing?.startedAt ?? partial.startedAt ?? now,
+      endedAt: partial.endedAt ?? (settled ? existing?.endedAt ?? now : undefined),
+    } as SubEntry)
+    globalEntryCache.set(targetSid, next)
+    persistEntriesForSession(targetSid, next)
+  }
+
   // ── cancel helpers ──
   const isDescendantOf = (childId: string, rootId: string): boolean => {
     const visited = new Set<string>()
@@ -655,6 +693,34 @@ function SubAgentPanel(props: {
       }
     } catch {}
     return false
+  }
+
+  // ── session tree helpers ──
+  const getParentId = (sid: string): string | undefined => {
+    try {
+      return (props.api.state.session.get(sid) as any)?.parentID
+    } catch {
+      return undefined
+    }
+  }
+
+  const collectAncestors = (sid: string): string[] => {
+    const ancestors: string[] = []
+    const visited = new Set<string>()
+    let current = sid
+    while (!visited.has(current)) {
+      visited.add(current)
+      const parent = getParentId(current)
+      if (!parent) break
+      ancestors.push(parent)
+      current = parent
+    }
+    return ancestors
+  }
+
+  const resolveRootSession = (sid: string): string => {
+    const ancestors = collectAncestors(sid)
+    return ancestors.at(-1) ?? sid
   }
 
   const cancelEntry = async (entry: SubEntry) => {
