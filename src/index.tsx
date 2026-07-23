@@ -1073,45 +1073,34 @@ function SubAgentPanel(props: {
       return changed ? next : prev
     })
 
-    // 当子代理所属的父 session 与当前视图不同时，通过模块级缓存定位
-    // 并更新父 session 的 entry 状态，随后写回 KV。
-    try {
-      const sessionObj = props.api.state.session.get(sid)
-      const parentSid = sessionObj?.parentID
-      if (parentSid && parentSid !== props.sessionId) {
-        // 优先从模块级缓存获取父 session 的 entries，不受当前视图切换影响
-        const parentCache = globalEntryCache.get(parentSid)
-        const nowTs = Date.now()
-        let found = false
-
-        if (parentCache) {
-          found = tryMatchAndUpdate(parentCache, sid, rawStatus, nowTs)
-        }
-
-        // 缓存未命中时回退到 KV 读取
-        if (!found) {
-          const data = loadSessionData()
-          const rec = data[parentSid]
-          if (rec?.entries) {
-            const fallbackMap = new Map(rec.entries.map((e: SubEntry) => [e.id, e]))
-            found = tryMatchAndUpdate(fallbackMap, sid, rawStatus, nowTs)
-            if (found) {
-              // 回退命中后写入 KV 并回填缓存
-              data[parentSid] = { ...rec, ts: nowTs, entries: [...fallbackMap.values()] }
-              saveSessionData(data)
-              globalEntryCache.set(parentSid, fallbackMap)
-            }
+    // Sync completion/error to ALL ancestors via collectAncestors (AC-S3-1)
+    for (const ancestorSid of collectAncestors(sid)) {
+      if (ancestorSid === props.sessionId) continue
+      const ancestorCache = globalEntryCache.get(ancestorSid)
+      const nowTs = Date.now()
+      let found = false
+      if (ancestorCache) {
+        found = tryMatchAndUpdate(ancestorCache, sid, rawStatus, nowTs)
+      }
+      if (!found) {
+        const data = loadSessionData()
+        const rec = data[ancestorSid]
+        if (rec?.entries) {
+          const fallbackMap = new Map(rec.entries.map((e: SubEntry) => [e.id, e]))
+          found = tryMatchAndUpdate(fallbackMap, sid, rawStatus, nowTs)
+          if (found) {
+            data[ancestorSid] = { ...rec, ts: nowTs, entries: [...fallbackMap.values()] }
+            saveSessionData(data)
+            globalEntryCache.set(ancestorSid, fallbackMap)
           }
         }
-
-        // 将模块级缓存中的最新状态同步到 KV
-        if (found && parentCache) {
-          const data = loadSessionData()
-          data[parentSid] = { ...data[parentSid], ts: nowTs, entries: [...parentCache.values()] }
-          saveSessionData(data)
-        }
       }
-    } catch {}
+      if (found && ancestorCache) {
+        const data = loadSessionData()
+        data[ancestorSid] = { ...data[ancestorSid], ts: nowTs, entries: [...ancestorCache.values()] }
+        saveSessionData(data)
+      }
+    }
 
     // Delayed backfill: re-read data after state sync catches up, to capture the final
     // token/cost values that may not have been available when session.idle fired.
@@ -1139,6 +1128,32 @@ function SubAgentPanel(props: {
         }
         return changed ? next : prev
       })
+      // Ancestor backfill: update all ancestor caches/KV with final token/cost (AC-S3-4)
+      for (const ancestorSid of collectAncestors(sid)) {
+        if (ancestorSid === props.sessionId) continue
+        const ancestorCache = globalEntryCache.get(ancestorSid)
+        if (!ancestorCache) continue
+        let ancestorChanged = false
+        for (const [, entry] of ancestorCache) {
+          if (entry.sessionId !== sid) continue
+          const t = finalTokens ?? entry.tokens
+          const c = finalCost ?? entry.cost
+          const m = finalModel ?? entry.model
+          const tt = finalTodo?.total ?? entry.todoTotal
+          const td = finalTodo?.done ?? entry.todoDone
+          if (t !== entry.tokens || c !== entry.cost || m !== entry.model ||
+              tt !== entry.todoTotal || td !== entry.todoDone) {
+            entry.tokens = t; entry.cost = c; entry.model = m
+            entry.todoTotal = tt; entry.todoDone = td
+            ancestorChanged = true
+          }
+        }
+        if (ancestorChanged) {
+          const data = loadSessionData()
+          data[ancestorSid] = { ...data[ancestorSid], ts: Date.now(), entries: [...ancestorCache.values()] }
+          saveSessionData(data)
+        }
+      }
       bump()
     }, 150)
   }
@@ -1264,6 +1279,7 @@ function SubAgentPanel(props: {
                     if (!part.id) continue
 
                     const st = (part as any).state as Record<string, unknown> | undefined
+                    const time = st?.time as { start?: number; end?: number } | undefined
                     const rawStatus = String(st?.status ?? "")
                     const exists = next.get(id)
 
@@ -1332,8 +1348,8 @@ function SubAgentPanel(props: {
                       tokens: exists?.tokens ?? tokens,
                       sessionId: exists?.sessionId ?? scanSubSid,
                       status,
-                      startedAt: exists?.startedAt || Date.now(),
-                      endedAt: ended ? (exists?.endedAt || Date.now()) : undefined,
+                      startedAt: exists?.startedAt ?? time?.start ?? Date.now(),
+                      endedAt: ended ? (exists?.endedAt ?? time?.end) : undefined,
                     })
                   }
                 }
