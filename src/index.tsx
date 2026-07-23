@@ -318,6 +318,8 @@ function safeErrorMsg(err: unknown): string {
 // 模块级缓存：各 session 的 entry 状态独立存储，不随当前视图切换而清除。
 const globalEntryCache = new Map<string, Map<string, SubEntry>>()
 
+// 模块级页面会话 ID：SubAgentPanel 展示的根页面会话，
+// 与 resolveRootSession 解析的任务会话可能不同。
 // 模块级刷新信号：外部（如斜杠命令）触发清除后 +1，组件 scan 依赖它以重扫。
 const [clearTick, setClearTick] = createSignal(0)
 
@@ -834,6 +836,12 @@ function SubAgentPanel(props: {
       if (visibleInCurrentView && rootSid !== props.sessionId) {
         upsertEntry({ id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
       }
+      // Persist to owner's cache so entry is available when switching to that view
+      if (ownerSid && rootSid !== ownerSid && ownerSid !== props.sessionId) {
+        upsertEntryForSession(ownerSid, { id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
+      }
+      // Always write to current panel for immediate visibility
+      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status: "running", model: modelId })
     }
 
     // ToolPart
@@ -863,6 +871,12 @@ function SubAgentPanel(props: {
           if (visibleInCurrentView && rootSid !== props.sessionId) {
             upsertEntry({ id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
           }
+          // Persist to owner's cache so entry is available when switching to that view
+          if (ownerSid && rootSid !== ownerSid && ownerSid !== props.sessionId) {
+            upsertEntryForSession(ownerSid, { id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
+          }
+          // Always write to current panel for immediate visibility
+          upsertEntry({ id, title: existing.title, agent: existing.agent, prompt: existing.prompt, status: "error" })
         }
         return
       }
@@ -898,6 +912,12 @@ function SubAgentPanel(props: {
       if (visibleInCurrentView && rootSid !== props.sessionId) {
         upsertEntry({ id, title, agent, prompt, sessionId: subSid, status, startedAt: time?.start })
       }
+      // Persist to owner's cache so entry is available when switching to that view
+      if (ownerSid && rootSid !== ownerSid && ownerSid !== props.sessionId) {
+        upsertEntryForSession(ownerSid, { id, title, agent, prompt, sessionId: subSid, status, startedAt: time?.start, endedAt: time?.end })
+      }
+      // Always write to current panel for immediate visibility
+      upsertEntry({ id, title, agent, prompt, sessionId: subSid, status, startedAt: time?.start })
     }
   }
 
@@ -1258,6 +1278,17 @@ function SubAgentPanel(props: {
           const next = (switched || forceReload)
             ? new Map(globalEntryCache.get(sid) ?? loadEntries(sid))
             : new Map(prev)
+          // Merge entries from all cached sessions for cross-session visibility
+          // This ensures entries written to child session caches are visible
+          // when viewing parent/page sessions (they are separate session trees)
+          for (const [cachedSid, cachedEntries] of globalEntryCache) {
+            if (cachedSid === sid) continue
+            for (const [cachedId, cachedEntry] of cachedEntries) {
+              if (!next.has(cachedId)) {
+                next.set(cachedId, cachedEntry)
+              }
+            }
+          }
           // 从 KV 加载当前会话的清除名单，扫描时跳过被手动清除的历史条目
           const { parentSid: scanPSid, isChild: scanChild } = resolveParent(sid)
           const scanRec = loadSessionData()[scanPSid]
